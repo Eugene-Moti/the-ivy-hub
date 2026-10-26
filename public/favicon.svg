@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="116 72 600 616" role="img" aria-label="The Ivy Group">
+  <defs>
+    <linearGradient id="gold" x1="0" y1="72" x2="0" y2="688" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E3C06A"/>
+      <stop offset="0.5" stop-color="#C99A30"/>
+      <stop offset="1" stop-color="#9E7620"/>
+    </linearGradient>
+  </defs>
+  <!-- 11 separate strokes: trunk, then mirrored branch pairs from top to bottom -->
+  <g fill="none" stroke="#C99A30" stroke-width="33" stroke-linecap="round" stroke-linejoin="round">
+    <path id="stroke-00" d="M416 653V103"/>
+    <path id="stroke-01" d="M355 275V167"/>
+    <path id="stroke-02" d="M477 275V167"/>
+    <path id="stroke-03" d="M416 400Q413 378 402 344C385 290 339 256 281 223"/>
+    <path id="stroke-04" d="M416 400Q419 378 430 344C447 290 493 256 551 223"/>
+    <path id="stroke-05" d="M349 595V431C346 356 296 300 237 275"/>
+    <path id="stroke-06" d="M483 595V431C486 356 536 300 595 275"/>
+    <path id="stroke-07" d="M286 528V452C285 389 250 351 187 326"/>
+    <path id="stroke-08" d="M546 528V452C547 389 582 351 645 326"/>
+    <path id="stroke-09" d="M226 459V449C219 408 197 378 149 379"/>
+    <path id="stroke-10" d="M606 459V449C613 408 635 378 683 379"/>
+  </g>
+</svg>

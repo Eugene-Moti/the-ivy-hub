@@ -1,9 +1,10 @@
 import { useState, type ComponentType } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router'
+import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
   ChartPieSliceIcon,
   GearSixIcon,
+  KeyIcon,
   ScrollIcon,
   SidebarSimpleIcon,
   SignOutIcon,
@@ -33,7 +34,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: ChartPieSliceIcon, roles: ['admin'] },
   { to: '/walk-ins/new', label: 'New Walk-in', icon: UserPlusIcon, roles: ['admin', 'receptionist'] },
   { to: '/records', label: 'Records', icon: TableIcon, roles: ['admin', 'receptionist'] },
-  { to: '/sales-persons', label: 'Sales Persons', icon: UsersThreeIcon, roles: ['admin'] },
+  { to: '/team', label: 'Team', icon: UsersThreeIcon, roles: ['admin'] },
   { to: '/settings', label: 'Settings', icon: GearSixIcon, roles: ['admin'] },
   { to: '/activity', label: 'Activity Log', icon: ScrollIcon, roles: ['admin'] },
 ]
@@ -162,6 +163,14 @@ export function AppShell() {
                 <span className="block text-[11px] text-muted">{user.title}</span>
               </span>
             </div>
+            <Link
+              to="/change-password"
+              aria-label="Change password"
+              title="Change password"
+              className="hidden size-10 place-items-center rounded-full border border-line text-muted focus-ring transition-all hover:-translate-y-0.5 hover:border-gold/50 hover:text-fg sm:grid"
+            >
+              <KeyIcon weight="bold" className="size-[18px]" />
+            </Link>
             <button
               type="button"
               onClick={() => signOut('manual')}

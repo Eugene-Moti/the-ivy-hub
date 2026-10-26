@@ -4,24 +4,59 @@ import type { WalkIn, WalkInNotification } from '../../data/types'
 import { formatPhone } from '../../lib/phone'
 import { formatDate, formatLongDate, formatTime } from '../../lib/time'
 import { IvyLogo } from '../IvyLogo'
+import { visitTypeLabel } from '../VisitType'
 import { Ticket } from '../Ticket'
 
 export interface WalkInLabels {
+  isClient: boolean
+  visitType: string
   project: string
   unitType: string
   source: string
   salesPerson: string | null
+  /** Who a non-client visitor came to see */
+  host: string | null
+  /** The person notified on arrival: the sales person or the host */
+  recipient: string | null
+  /** One line for passes and lists: "Ivy Gardens · 2 Bedroom" or "Meeting · Daniel Mwangi" */
+  summary: string
+}
+
+const EMPTY_LABELS: WalkInLabels = {
+  isClient: true,
+  visitType: '',
+  project: '',
+  unitType: '',
+  source: '',
+  salesPerson: null,
+  host: null,
+  recipient: null,
+  summary: '',
 }
 
 export function useWalkInLabels(w: WalkIn | null | undefined): WalkInLabels {
   const ref = useRefData()
-  if (!w) return { project: '', unitType: '', source: '', salesPerson: null }
+  if (!w) return EMPTY_LABELS
+  const isClient = w.visitType === 'client'
   const source = ref.source(w.sourceId)
+  const project = isClient ? (ref.project(w.projectId)?.name ?? 'Unknown project') : ''
+  const unitType = isClient ? (ref.unitType(w.unitTypeId)?.name ?? 'Unknown unit') : ''
+  const salesPerson = ref.member(w.salesPersonId)?.fullName ?? null
+  const host = isClient ? null : (ref.member(w.hostId)?.fullName ?? w.hostName ?? null)
   return {
-    project: ref.project(w.projectId)?.name ?? 'Unknown project',
-    unitType: ref.unitType(w.unitTypeId)?.name ?? 'Unknown unit',
-    source: source?.kind === 'other' && w.otherSourceText ? `Other: ${w.otherSourceText}` : (source?.name ?? 'Unknown'),
-    salesPerson: ref.salesPerson(w.salesPersonId)?.fullName ?? null,
+    isClient,
+    visitType: visitTypeLabel(w.visitType),
+    project,
+    unitType,
+    source: isClient
+      ? source?.kind === 'other' && w.otherSourceText
+        ? `Other: ${w.otherSourceText}`
+        : (source?.name ?? 'Unknown')
+      : '',
+    salesPerson,
+    host,
+    recipient: isClient ? salesPerson : host,
+    summary: isClient ? `${project} · ${unitType}` : [visitTypeLabel(w.visitType), host].filter(Boolean).join(' · '),
   }
 }
 
@@ -53,11 +88,16 @@ export function WalkInSlip({ walkIn, labels, companyName, notifications, queued 
   const rows: [string, string][] = [
     ['Visitor', walkIn.fullName],
     ['Phone', formatPhone(walkIn.phone)],
-    ['Project', labels.project],
-    ['Unit type', labels.unitType],
-    ['Source', labels.source],
   ]
-  if (labels.salesPerson) rows.push(['Sales person', labels.salesPerson])
+  if (labels.isClient) {
+    rows.push(['Project', labels.project], ['Unit type', labels.unitType], ['Source', labels.source])
+    if (labels.salesPerson) rows.push(['Sales person', labels.salesPerson])
+  } else {
+    rows.push(['Visit', labels.visitType])
+    if (labels.host) rows.push(['Here to see', labels.host])
+    if (walkIn.organisation) rows.push(['Organisation', walkIn.organisation])
+    if (walkIn.purpose) rows.push(['Purpose', walkIn.purpose])
+  }
 
   return (
     <div className="font-sans text-[13px] leading-relaxed">
@@ -83,16 +123,16 @@ export function WalkInSlip({ walkIn, labels, companyName, notifications, queued 
       <p className="text-center text-[12px] text-ink-500">Recorded by {walkIn.createdByName ?? 'reception'}</p>
       <p className="mt-1 text-center font-mono text-[13px] font-bold tracking-wider">{walkIn.reference}</p>
       {queued && <p className="mt-1 text-center text-[11px] text-ink-500">Provisional reference until synced</p>}
-      {labels.salesPerson && n.allSent && (
+      {labels.recipient && n.allSent && (
         <p className="mt-3 flex items-center justify-center gap-1.5 rounded-md bg-emerald/15 px-2 py-1.5 text-[12px] font-semibold text-[#166c3b]">
           <CheckCircleIcon weight="fill" className="size-4" />
-          Email &amp; WhatsApp sent to {labels.salesPerson}
+          Email &amp; WhatsApp sent to {labels.recipient}
         </p>
       )}
-      {labels.salesPerson && !n.allSent && n.any && !n.inFlight && (
+      {labels.recipient && !n.allSent && n.any && !n.inFlight && (
         <p className="mt-3 flex items-center justify-center gap-1.5 rounded-md bg-amber/15 px-2 py-1.5 text-[12px] font-semibold text-[#8a5a0a]">
           <WarningIcon weight="fill" className="size-4" />
-          {n.pendingSetup ? `Notifications pending setup` : `Could not notify ${labels.salesPerson}`}
+          {n.pendingSetup ? `Notifications pending setup` : `Could not notify ${labels.recipient}`}
         </p>
       )}
     </div>
@@ -156,9 +196,7 @@ export function VisitorPass({
         <div>
           <p className="text-[10px] font-bold tracking-[0.2em] text-ink-900/60 uppercase">Welcome</p>
           <p className="font-display text-[1.75rem] leading-tight break-words">{walkIn.fullName}</p>
-          <p className="mt-1 text-[13px] font-medium text-ink-900/75">
-            {labels.project} · {labels.unitType}
-          </p>
+          <p className="mt-1 text-[13px] font-medium text-ink-900/75">{labels.summary}</p>
         </div>
         <p className="text-[11px] font-medium text-ink-900/65">{formatLongDate(walkIn.visitedAt)}</p>
       </div>

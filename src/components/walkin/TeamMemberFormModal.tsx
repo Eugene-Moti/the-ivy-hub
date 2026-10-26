@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { UserPlusIcon } from '@phosphor-icons/react'
 import { api } from '../../data'
 import { useRefData } from '../../data/RefDataProvider'
-import type { SalesPerson } from '../../data/types'
+import type { TeamMember } from '../../data/types'
 import { uuid } from '../../lib/ids'
 import { formatPhone, normalisePhone, phoneError } from '../../lib/phone'
 import { zodResolver } from '../../lib/zodResolver'
@@ -22,7 +22,9 @@ const schema = z
     sameAsPhone: z.boolean(),
     whatsapp: z.string(),
     email: z.string().trim().min(1, 'Email is required for notifications'),
-    team: z.string().trim(),
+    title: z.string().trim().max(80),
+    branch: z.string().trim().max(80),
+    isSalesPerson: z.boolean(),
   })
   .superRefine((v, ctx) => {
     const p = phoneError(v.phone)
@@ -41,14 +43,23 @@ interface Props {
   open: boolean
   onClose: () => void
   /** Edit an existing person (admin). Omit to create. */
-  person?: SalesPerson | null
+  person?: TeamMember | null
   prefillName?: string
-  onSaved?: (person: SalesPerson) => void
+  /** Opened from the sales-person picker: the new member can be assigned clients. */
+  defaultSalesPerson?: boolean
+  onSaved?: (person: TeamMember) => void
 }
 
-/** Add (from the walk-in form or the Sales Persons page) or edit a sales person. */
-export function SalesPersonFormModal({ open, onClose, person, prefillName = '', onSaved }: Props) {
-  const { submitSalesPerson } = useSync()
+/** Add (from the walk-in form or the Team page) or edit a team member. */
+export function TeamMemberFormModal({
+  open,
+  onClose,
+  person,
+  prefillName = '',
+  defaultSalesPerson = false,
+  onSaved,
+}: Props) {
+  const { submitTeamMember } = useSync()
   const { refresh } = useRefData()
   const { toast } = useToast()
   const action = useDynamicAction(1200)
@@ -73,11 +84,22 @@ export function SalesPersonFormModal({ open, onClose, person, prefillName = '', 
             sameAsPhone: person.whatsapp === person.phone,
             whatsapp: formatPhone(person.whatsapp),
             email: person.email,
-            team: person.team ?? '',
+            title: person.title ?? '',
+            branch: person.branch ?? '',
+            isSalesPerson: person.isSalesPerson,
           }
-        : { fullName: prefillName, phone: '+254 ', sameAsPhone: true, whatsapp: '+254 ', email: '', team: '' },
+        : {
+            fullName: prefillName,
+            phone: '+254 ',
+            sameAsPhone: true,
+            whatsapp: '+254 ',
+            email: '',
+            title: defaultSalesPerson ? 'Sales Executive' : '',
+            branch: '',
+            isSalesPerson: defaultSalesPerson,
+          },
     )
-  }, [open, person, prefillName, reset])
+  }, [open, person, prefillName, defaultSalesPerson, reset])
 
   const sameAsPhone = watch('sameAsPhone')
 
@@ -88,20 +110,22 @@ export function SalesPersonFormModal({ open, onClose, person, prefillName = '', 
       phone,
       whatsapp: v.sameAsPhone ? phone : normalisePhone(v.whatsapp)!,
       email: v.email.toLowerCase(),
-      team: v.team || null,
+      title: v.title || null,
+      branch: v.branch || null,
+      isSalesPerson: v.isSalesPerson,
     }
     try {
       const saved = await action.run(async () => {
         if (person) {
-          const updated = await api.updateSalesPerson(person.id, values)
+          const updated = await api.updateTeamMember(person.id, values)
           await refresh()
           return { person: updated, queued: false }
         }
-        return submitSalesPerson({ id: uuid(), ...values })
+        return submitTeamMember({ id: uuid(), ...values })
       })
       if (saved.queued)
         toast({
-          title: 'Sales person saved offline',
+          title: 'Team member saved offline',
           description: 'They will sync when you are back online.',
           tone: 'warning',
         })
@@ -109,7 +133,7 @@ export function SalesPersonFormModal({ open, onClose, person, prefillName = '', 
       window.setTimeout(onClose, 650)
     } catch (err) {
       toast({
-        title: 'Could not save sales person',
+        title: 'Could not save',
         description: err instanceof Error ? err.message : undefined,
         tone: 'error',
       })
@@ -120,7 +144,7 @@ export function SalesPersonFormModal({ open, onClose, person, prefillName = '', 
     <Modal
       open={open}
       onClose={onClose}
-      title={editing ? 'Edit sales person' : 'Add a sales person'}
+      title={editing ? 'Edit team member' : defaultSalesPerson ? 'Add a sales person' : 'Add a team member'}
       description={editing ? undefined : 'They will be selected on the form straight away.'}
       size="md"
       footer={
@@ -130,20 +154,24 @@ export function SalesPersonFormModal({ open, onClose, person, prefillName = '', 
           </Button>
           <DynamicButton
             type="submit"
-            form="sales-person-form"
+            form="team-member-form"
             state={action.state}
             icon={editing ? undefined : <UserPlusIcon weight="bold" />}
             labels={
               editing
                 ? { idle: 'Save changes', loading: 'Saving…', success: 'Saved' }
-                : { idle: 'Add sales person', loading: 'Adding…', success: 'Added' }
+                : {
+                    idle: defaultSalesPerson ? 'Add sales person' : 'Add team member',
+                    loading: 'Adding…',
+                    success: 'Added',
+                  }
             }
           />
         </>
       }
     >
       <form
-        id="sales-person-form"
+        id="team-member-form"
         noValidate
         onSubmit={(e) => {
           e.stopPropagation()
@@ -169,9 +197,21 @@ export function SalesPersonFormModal({ open, onClose, person, prefillName = '', 
             {(a) => <TextInput {...a} {...register('whatsapp')} type="tel" inputMode="tel" autoComplete="off" />}
           </Field>
         )}
-        <Field label="Team / branch" hint="Optional" className="sm:col-span-2">
-          {(a) => <TextInput {...a} {...register('team')} autoComplete="off" placeholder="e.g. Westlands" />}
+        <Field label="Job title" hint="Optional">
+          {(a) => <TextInput {...a} {...register('title')} autoComplete="off" placeholder="e.g. Accounts" />}
         </Field>
+        <Field label="Team / branch" hint="Optional">
+          {(a) => <TextInput {...a} {...register('branch')} autoComplete="off" placeholder="e.g. Westlands" />}
+        </Field>
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-line bg-field p-3 text-sm text-fg/85 sm:col-span-2">
+          <input type="checkbox" {...register('isSalesPerson')} className="mt-0.5 size-4 accent-[#c99a30]" />
+          <span>
+            <span className="font-semibold text-fg">Sales person</span>
+            <span className="block text-[13px] text-muted">
+              Can be chosen when a client says they came to see a sales person.
+            </span>
+          </span>
+        </label>
       </form>
     </Modal>
   )

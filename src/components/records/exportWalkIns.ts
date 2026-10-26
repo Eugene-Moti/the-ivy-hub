@@ -1,5 +1,6 @@
 import type { ReferenceData, WalkIn } from '../../data/types'
 import { formatPhone } from '../../lib/phone'
+import { visitTypeLabel } from '../VisitType'
 import { eatDateKey, formatTime, todayKey } from '../../lib/time'
 
 export type ExportFormat = 'csv' | 'xlsx'
@@ -16,11 +17,15 @@ function columns(ref: ReferenceData, includeDeleted: boolean) {
     ['Full name', (w) => w.fullName],
     ['Phone', (w) => formatPhone(w.phone)],
     ['Email', (w) => w.email ?? ''],
+    ['Visit type', (w) => visitTypeLabel(w.visitType)],
     ['Project', (w) => name(ref.projects, w.projectId)],
     ['Unit type', (w) => name(ref.unitTypes, w.unitTypeId)],
     ['Source', (w) => name(ref.sources, w.sourceId)],
     ['Other source', (w) => w.otherSourceText ?? ''],
-    ['Sales person', (w) => name(ref.salesPersons, w.salesPersonId)],
+    ['Sales person', (w) => name(ref.team, w.salesPersonId)],
+    ['Here to see', (w) => (w.hostId ? name(ref.team, w.hostId) : (w.hostName ?? ''))],
+    ['Organisation', (w) => w.organisation ?? ''],
+    ['Purpose', (w) => w.purpose ?? ''],
     ['Returning', (w) => (w.isReturning ? 'Yes' : 'No')],
     ['Notes', (w) => w.notes ?? ''],
     ['Recorded by', (w) => w.createdByName ?? ''],

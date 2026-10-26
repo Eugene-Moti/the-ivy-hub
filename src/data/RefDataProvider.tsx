@@ -3,7 +3,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { readJSON, writeJSON } from '../lib/storage'
 import { api } from '.'
 import { DEFAULT_SETTINGS } from './demo/seed'
-import type { AppSettings, LeadSource, Project, ReferenceData, SalesPerson, UnitType } from './types'
+import type { AppSettings, LeadSource, Project, ReferenceData, TeamMember, UnitType } from './types'
 
 // Dropdown lists (projects, unit types, sources, sales persons) + app settings.
 // Cached locally so the walk-in form keeps working offline.
@@ -18,11 +18,11 @@ interface RefDataValue {
   fromCache: boolean
   refresh: () => Promise<void>
   /** Adds a sales person created offline so it can be selected before it syncs. */
-  addLocalSalesPerson: (person: SalesPerson) => void
+  addLocalMember: (person: TeamMember) => void
   project: (id: string | null | undefined) => Project | undefined
   unitType: (id: string | null | undefined) => UnitType | undefined
   source: (id: string | null | undefined) => LeadSource | undefined
-  salesPerson: (id: string | null | undefined) => SalesPerson | undefined
+  member: (id: string | null | undefined) => TeamMember | undefined
 }
 
 const RefDataContext = createContext<RefDataValue | null>(null)
@@ -39,10 +39,10 @@ export function RefDataProvider({ children }: { children: ReactNode }) {
       const fresh = await api.getReferenceData()
       setData((prev) => {
         // Keep offline-created sales persons that have not synced yet.
-        const unsynced = (prev?.salesPersons ?? []).filter(
-          (p) => p.createdAt.startsWith('local:') && !fresh.salesPersons.some((f) => f.id === p.id),
+        const unsynced = (prev?.team ?? []).filter(
+          (p) => p.createdAt.startsWith('local:') && !fresh.team.some((f) => f.id === p.id),
         )
-        const next = { ...fresh, salesPersons: [...fresh.salesPersons, ...unsynced] }
+        const next = { ...fresh, team: [...fresh.team, ...unsynced] }
         writeJSON(CACHE_KEY, next)
         return next
       })
@@ -64,10 +64,10 @@ export function RefDataProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('online', onOnline)
   }, [user, refresh])
 
-  const addLocalSalesPerson = useCallback((person: SalesPerson) => {
+  const addLocalMember = useCallback((person: TeamMember) => {
     setData((prev) => {
       if (!prev) return prev
-      const next = { ...prev, salesPersons: [...prev.salesPersons.filter((p) => p.id !== person.id), person] }
+      const next = { ...prev, team: [...prev.team.filter((p) => p.id !== person.id), person] }
       writeJSON(CACHE_KEY, next)
       return next
     })
@@ -84,13 +84,13 @@ export function RefDataProvider({ children }: { children: ReactNode }) {
       loading,
       fromCache,
       refresh,
-      addLocalSalesPerson,
+      addLocalMember,
       project: byId(data?.projects),
       unitType: byId(data?.unitTypes),
       source: byId(data?.sources),
-      salesPerson: byId(data?.salesPersons),
+      member: byId(data?.team),
     }
-  }, [data, loading, fromCache, refresh, addLocalSalesPerson])
+  }, [data, loading, fromCache, refresh, addLocalMember])
 
   return <RefDataContext.Provider value={value}>{children}</RefDataContext.Provider>
 }

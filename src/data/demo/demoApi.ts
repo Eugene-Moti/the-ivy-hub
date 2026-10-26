@@ -173,6 +173,24 @@ export const demoApi: Api = {
     await wait(700, 1000)
   },
 
+  async completePasswordReset() {
+    throw new ApiError('Password-reset links only work once the Neon backend is connected.', 'invalid')
+  },
+
+  async changePassword(currentPassword, newPassword) {
+    await wait(400, 700)
+    const db = load()
+    const user = actor(db)
+    if (user.password !== currentPassword) throw new ApiError('Your current password is not correct.', 'invalid')
+    if (newPassword === currentPassword)
+      throw new ApiError('Choose a password you have not used here before.', 'invalid')
+    user.password = newPassword
+    user.mustChangePassword = true
+    user.mustChangePassword = false
+    log(db, user, 'password_reset', 'user', user.id, null, { name: user.name, self_service: true })
+    save(db)
+  },
+
   async getReferenceData() {
     await wait(200, 450)
     const db = load()
@@ -181,7 +199,7 @@ export const demoApi: Api = {
       projects: db.projects.filter((p) => !p.deletedAt),
       unitTypes: db.unitTypes.filter((u) => !u.deletedAt),
       sources: db.sources.filter((s) => !s.deletedAt),
-      salesPersons: db.salesPersons,
+      team: db.team,
       settings: db.settings,
     }
   },
@@ -205,13 +223,14 @@ export const demoApi: Api = {
       deleteReason: null,
     }
     db.walkIns.push(walkIn)
-    const source = db.sources.find((s) => s.id === input.sourceId)
-    if (source?.kind === 'sales_person' && input.salesPersonId) {
+    // Tell the sales person (client visits) or the host (other visits) that their visitor has arrived.
+    const recipientId = input.visitType === 'client' ? input.salesPersonId : input.hostId
+    if (recipientId) {
       for (const channel of ['email', 'whatsapp'] as const) {
         db.notifications.push({
           id: uuid(),
           walkInId: walkIn.id,
-          salesPersonId: input.salesPersonId,
+          recipientId,
           channel,
           status: 'queued',
           error: null,
@@ -360,30 +379,32 @@ export const demoApi: Api = {
     return { email: ok, whatsapp: ok, emailProvider: 'Demo (simulated)', whatsappProvider: 'Demo (simulated)' }
   },
 
-  async createSalesPerson(input) {
+  async createTeamMember(input) {
     await wait(300, 600)
     const db = load()
     const user = actor(db)
-    const existing = db.salesPersons.find((s) => s.id === input.id)
+    const existing = db.team.find((s) => s.id === input.id)
     if (existing) return existing
     const person = { ...input, isActive: true, createdBy: user.id, createdAt: nowIso() }
-    db.salesPersons.push(person)
-    log(db, user, 'sales_person_added', 'sales_person', person.id, null, {
+    db.team.push(person)
+    log(db, user, 'team_member_added', 'sales_person', person.id, null, {
       full_name: person.fullName,
       phone: person.phone,
       whatsapp: person.whatsapp,
       email: person.email,
-      team: person.team,
+      title: person.title,
+      branch: person.branch,
+      is_sales_person: person.isSalesPerson,
     })
     save(db)
     return person
   },
 
-  async updateSalesPerson(id, patch) {
+  async updateTeamMember(id, patch) {
     await wait()
     const db = load()
     const user = requireAdmin(db)
-    const person = db.salesPersons.find((s) => s.id === id)
+    const person = db.team.find((s) => s.id === id)
     if (!person) throw new ApiError('Sales person not found.', 'not_found')
     const before = { ...person }
     Object.assign(person, patch)
@@ -392,7 +413,7 @@ export const demoApi: Api = {
       log(
         db,
         user,
-        'sales_person_edited',
+        'team_member_edited',
         'sales_person',
         id,
         Object.fromEntries([['full_name', before.fullName], ...changed.map((k) => [k, before[k]])]),
@@ -574,6 +595,7 @@ export const demoApi: Api = {
       role: input.role,
       title: input.role === 'admin' ? 'Admin' : 'Receptionist',
       isActive: true,
+      mustChangePassword: true,
       createdAt: nowIso(),
       password: input.password,
     }
@@ -618,6 +640,7 @@ export const demoApi: Api = {
     const user = db.users.find((u) => u.id === id)
     if (!user) throw new ApiError('User not found.', 'not_found')
     user.password = newPassword
+    user.mustChangePassword = true
     clearFailures(user.username)
     clearFailures(user.email)
     log(db, admin, 'password_reset', 'user', id, null, { name: user.name })

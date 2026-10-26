@@ -5,14 +5,14 @@ import type {
   AppSettings,
   ExportMeta,
   LeadSource,
-  NewSalesPerson,
+  NewTeamMember,
   NewUser,
   NewWalkIn,
   Page,
   Profile,
   Project,
   ReferenceData,
-  SalesPerson,
+  TeamMember,
   UnitType,
   WalkIn,
   WalkInFilters,
@@ -23,16 +23,20 @@ import type {
 /**
  * Everything the UI needs from the backend. Two implementations:
  * - demoApi: in-browser, seeded data (no backend needed; used until Supabase is configured)
- * - supabaseApi: Postgres + Auth + Edge Functions, permissions enforced with RLS
+ * - neonApi: Neon Postgres + Managed Better Auth + Data API (RLS) + Vercel functions in /api
  */
 export interface Api {
-  mode: 'demo' | 'supabase'
+  mode: 'demo' | 'live'
 
   // Auth
   restoreSession(): Promise<Profile | null>
   signIn(identifier: string, password: string, remember: boolean): Promise<SignInResult>
   signOut(reason: SignOutReason): Promise<void>
   requestPasswordReset(email: string): Promise<void>
+  /** Finish the emailed reset link flow (token comes from the link). */
+  completePasswordReset(token: string, newPassword: string): Promise<void>
+  /** Signed-in user changes their own password (also clears a forced change). */
+  changePassword(currentPassword: string, newPassword: string): Promise<void>
 
   // Reference lists
   getReferenceData(): Promise<ReferenceData>
@@ -61,12 +65,9 @@ export interface Api {
     whatsappProvider: string
   }>
 
-  // Sales persons
-  createSalesPerson(input: NewSalesPerson): Promise<SalesPerson>
-  updateSalesPerson(
-    id: string,
-    patch: Partial<Omit<SalesPerson, 'id' | 'createdBy' | 'createdAt'>>,
-  ): Promise<SalesPerson>
+  // Team members (sales persons and other staff visitors can ask for)
+  createTeamMember(input: NewTeamMember): Promise<TeamMember>
+  updateTeamMember(id: string, patch: Partial<Omit<TeamMember, 'id' | 'createdBy' | 'createdAt'>>): Promise<TeamMember>
 
   // Admin-managed lists. "Delete" archives the row so history keeps its labels.
   saveProject(project: Pick<Project, 'name' | 'isActive'> & { id?: string }): Promise<Project>

@@ -56,7 +56,7 @@ export function WalkInDrawer({ walkIn, onClose, onChanged }: Props) {
 
   // Load notification status; keep polling briefly while a send is still queued.
   useEffect(() => {
-    if (!w?.salesPersonId) return
+    if (!(w?.salesPersonId ?? w?.hostId)) return
     let cancelled = false
     let tries = 0
     const load = async () => {
@@ -73,7 +73,7 @@ export function WalkInDrawer({ walkIn, onClose, onChanged }: Props) {
     return () => {
       cancelled = true
     }
-  }, [w?.id, w?.salesPersonId])
+  }, [w?.id, w?.salesPersonId, w?.hostId])
 
   const canEdit = useMemo(() => {
     if (!w || !user || w.deletedAt) return false
@@ -112,10 +112,19 @@ export function WalkInDrawer({ walkIn, onClose, onChanged }: Props) {
         '—'
       ),
     ],
-    ['Project', labels.project],
-    ['Unit type', labels.unitType],
-    ['Source', labels.source],
-    ['Sales person', labels.salesPerson ?? '—'],
+    ['Visit', labels.visitType],
+    ...((labels.isClient
+      ? [
+          ['Project', labels.project],
+          ['Unit type', labels.unitType],
+          ['Source', labels.source],
+          ['Sales person', labels.salesPerson ?? '—'],
+        ]
+      : [
+          ['Here to see', labels.host ?? '—'],
+          ['Organisation', w.organisation ?? '—'],
+          ['Purpose', w.purpose ?? '—'],
+        ]) as [string, ReactNode][]),
     ['Recorded by', w.createdByName ?? '—'],
     ['Reference', <span className="font-mono">{w.reference}</span>],
     ['Consent', w.consent ? 'Given' : 'Not recorded'],
@@ -185,9 +194,11 @@ export function WalkInDrawer({ walkIn, onClose, onChanged }: Props) {
             )}
           </dl>
 
-          {w.salesPersonId && (
+          {(w.salesPersonId || w.hostId) && (
             <section>
-              <h3 className="mb-3 font-display text-lg text-fg">Sales-person notifications</h3>
+              <h3 className="mb-3 font-display text-lg text-fg">
+                {labels.isClient ? 'Sales-person notifications' : 'Host notifications'}
+              </h3>
               <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
                 {notifications.length === 0 && (
                   <p className="p-4 text-sm text-muted">No notifications recorded for this walk-in.</p>

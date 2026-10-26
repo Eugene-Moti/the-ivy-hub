@@ -10,6 +10,7 @@ export function searchDigits(query: string): string | null {
 
 export function matchesFilters(w: WalkIn, f: WalkInFilters): boolean {
   if (w.deletedAt && !f.includeDeleted) return false
+  if (f.visitType && w.visitType !== f.visitType) return false
   if (f.projectId && w.projectId !== f.projectId) return false
   if (f.unitTypeId && w.unitTypeId !== f.unitTypeId) return false
   if (f.sourceId && w.sourceId !== f.sourceId) return false
@@ -26,6 +27,7 @@ export function matchesFilters(w: WalkIn, f: WalkInFilters): boolean {
       w.fullName.toLowerCase().includes(q) ||
       (w.email?.toLowerCase().includes(q) ?? false) ||
       (w.reference?.toLowerCase().includes(q) ?? false) ||
+      (w.organisation?.toLowerCase().includes(q) ?? false) ||
       (digits !== null && w.phone.replace(/\D/g, '').includes(digits))
     if (!hit) return false
   }
@@ -38,11 +40,16 @@ const AUDITED: [keyof WalkIn, string][] = [
   ['fullName', 'full_name'],
   ['phone', 'phone'],
   ['email', 'email'],
+  ['visitType', 'visit_type'],
   ['projectId', 'project_id'],
   ['unitTypeId', 'unit_type_id'],
   ['sourceId', 'source_id'],
   ['salesPersonId', 'sales_person_id'],
   ['otherSourceText', 'other_source_text'],
+  ['hostId', 'host_id'],
+  ['hostName', 'host_name'],
+  ['organisation', 'organisation'],
+  ['purpose', 'purpose'],
   ['notes', 'notes'],
 ]
 

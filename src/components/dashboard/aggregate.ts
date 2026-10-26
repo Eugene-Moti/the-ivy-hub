@@ -58,7 +58,7 @@ export interface Slice {
 
 /** Part-to-whole by source: top 5 named, the rest folded into "Other" (donuts stay ≤ 6 segments). */
 export function bySource(rows: WalkIn[], ref: ReferenceData): { slices: Slice[]; all: Slice[] } {
-  const counts = countBy(rows, (w) => w.sourceId)
+  const counts = countBy(rows, (w) => w.sourceId as string | null)
   const all = [...counts.entries()]
     .map(([id, value]) => ({ id, name: ref.sources.find((s) => s.id === id)?.name ?? 'Unknown', value }))
     .sort((a, b) => b.value - a.value)
@@ -78,6 +78,7 @@ export interface ProjectGroup {
 export function byProjectUnit(rows: WalkIn[], ref: ReferenceData): ProjectGroup[] {
   const groups = new Map<string, ProjectGroup>()
   for (const w of rows) {
+    if (!w.projectId || !w.unitTypeId) continue
     let g = groups.get(w.projectId)
     if (!g) {
       g = {
@@ -109,8 +110,8 @@ export function topSalesPersons(rows: WalkIn[], ref: ReferenceData, limit = 8) {
   const counts = countBy(rows, (w) => w.salesPersonId)
   return [...counts.entries()]
     .map(([id, value]) => {
-      const p = ref.salesPersons.find((s) => s.id === id)
-      return { id, name: p?.fullName ?? 'Unknown', team: p?.team ?? null, value }
+      const p = ref.team.find((s) => s.id === id)
+      return { id, name: p?.fullName ?? 'Unknown', branch: p?.branch ?? null, value }
     })
     .sort((a, b) => b.value - a.value)
     .slice(0, limit)
@@ -149,4 +150,13 @@ export function heatmap(rows: WalkIn[], settings: AppSettings) {
   }
   const max = Math.max(0, ...cells.values())
   return { days, hours, cells, max, outside }
+}
+
+/** Walk-ins that were clients (marketing reports only count these). */
+export const clientsOnly = (rows: WalkIn[]) => rows.filter((w) => w.visitType === 'client')
+
+/** Non-client visits by type, most common first. */
+export function otherVisits(rows: WalkIn[]) {
+  const counts = countBy(rows, (w) => (w.visitType === 'client' ? null : w.visitType))
+  return [...counts.entries()].map(([type, value]) => ({ type, value })).sort((a, b) => b.value - a.value)
 }

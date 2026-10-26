@@ -1,7 +1,7 @@
 // Ivy Hub service worker: makes the app installable and keeps the app shell available offline.
 // Data never comes from here: walk-ins are queued in IndexedDB by the app and synced when online.
 
-const VERSION = 'ivy-hub-v3'
+const VERSION = 'ivy-hub-v4'
 // Hosts often send `Vary: Origin`; module scripts carry an Origin header the precache requests lack.
 const MATCH = { ignoreVary: true }
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/favicon.svg', '/ivy-logo.svg', '/icons/icon-192.png', '/icons/icon-512.png', '/textures/plastic-noise.svg', '/textures/receipt-paper.svg']
@@ -38,7 +38,8 @@ self.addEventListener('fetch', (event) => {
   const req = event.request
   if (req.method !== 'GET') return
   const url = new URL(req.url)
-  if (url.origin !== self.location.origin) return // Supabase / provider APIs are never cached
+  // Neon (auth, Data API) and our own /api functions are never cached
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return
 
   // Pages: network first so updates arrive, cached shell when offline. A 3s cap stops a flaky
   // connection ("lie-fi") from leaving reception staring at a blank screen.

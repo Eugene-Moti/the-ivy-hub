@@ -8,7 +8,9 @@ export const IDLE_TIMEOUT_MS = 30 * 60 * 1000
 export const MAX_FAILED_ATTEMPTS = 5
 export const LOCKOUT_MS = 15 * 60 * 1000
 
-export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL?.trim() || ''
-export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() || ''
-/** Demo mode runs entirely in the browser on seeded data. It switches off once Supabase is configured. */
-export const IS_DEMO = !SUPABASE_URL || !SUPABASE_ANON_KEY
+// Neon: Managed Better Auth + Data API. Both URLs are public endpoints (not secrets), shown in the
+// Neon Console under Better Auth → Configuration and Postgres database → Data API.
+export const NEON_AUTH_URL = import.meta.env.VITE_NEON_AUTH_URL?.trim() || ''
+export const NEON_DATA_API_URL = import.meta.env.VITE_NEON_DATA_API_URL?.trim() || ''
+/** Demo mode runs entirely in the browser on seeded data. It switches off once Neon is configured. */
+export const IS_DEMO = !NEON_AUTH_URL || !NEON_DATA_API_URL

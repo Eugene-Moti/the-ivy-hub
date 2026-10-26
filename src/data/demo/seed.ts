@@ -6,7 +6,7 @@ import type {
   LeadSource,
   Profile,
   Project,
-  SalesPerson,
+  TeamMember,
   UnitType,
   WalkIn,
   WalkInNotification,
@@ -22,14 +22,14 @@ export interface DemoDb {
   projects: (Project & { deletedAt: string | null })[]
   unitTypes: (UnitType & { deletedAt: string | null })[]
   sources: (LeadSource & { deletedAt: string | null })[]
-  salesPersons: SalesPerson[]
+  team: TeamMember[]
   settings: AppSettings
   walkIns: WalkIn[]
   notifications: WalkInNotification[]
   activity: ActivityEntry[]
 }
 
-export const DEMO_DB_VERSION = 3
+export const DEMO_DB_VERSION = 4
 
 /** "Tap to fill" buttons on the login card (demo mode only). */
 export const DEMO_LOGINS = [
@@ -155,6 +155,7 @@ export function createSeed(): DemoDb {
       role: 'admin',
       title: 'Marketing Lead',
       isActive: true,
+      mustChangePassword: false,
       createdAt: created,
       password: 'IvyAdmin#2026',
     },
@@ -166,6 +167,7 @@ export function createSeed(): DemoDb {
       role: 'receptionist',
       title: 'Receptionist',
       isActive: true,
+      mustChangePassword: false,
       createdAt: created,
       password: 'IvyDesk#2026',
     },
@@ -217,24 +219,55 @@ export function createSeed(): DemoDb {
     src('s-other', 'Other', 'dots', 9, 'other'),
   ]
 
-  const sp = (id: string, fullName: string, n: number, team: string): SalesPerson => ({
+  const member = (
+    id: string,
+    fullName: string,
+    n: number,
+    title: string,
+    branch: string,
+    isSalesPerson: boolean,
+  ): TeamMember => ({
     id,
     fullName,
     phone: `+2547000001${String(n).padStart(2, '0')}`,
     whatsapp: `+2547000001${String(n).padStart(2, '0')}`,
     email: `${fullName.split(' ')[0].toLowerCase()}@ivygroup.demo`,
-    team,
+    title,
+    branch,
+    isSalesPerson,
     isActive: true,
     createdBy: 'u-admin',
     createdAt: created,
   })
-  const salesPersons = [
-    sp('sp-brian', 'Brian Otieno', 1, 'Westlands'),
-    sp('sp-faith', 'Faith Njeri', 2, 'Westlands'),
-    sp('sp-kevin', 'Kevin Mutua', 3, 'Kilimani'),
-    sp('sp-lilian', 'Lilian Chebet', 4, 'Kilimani'),
-    sp('sp-samuel', 'Samuel Kiprono', 5, 'Diaspora desk'),
+  const team = [
+    member('sp-brian', 'Brian Otieno', 1, 'Sales Executive', 'Westlands', true),
+    member('sp-faith', 'Faith Njeri', 2, 'Sales Executive', 'Westlands', true),
+    member('sp-kevin', 'Kevin Mutua', 3, 'Sales Executive', 'Kilimani', true),
+    member('sp-lilian', 'Lilian Chebet', 4, 'Senior Sales Executive', 'Kilimani', true),
+    member('sp-samuel', 'Samuel Kiprono', 5, 'Diaspora Sales', 'Diaspora desk', true),
+    member('tm-daniel', 'Daniel Mwangi', 6, 'Chief Executive Officer', 'Head office', false),
+    member('tm-agnes', 'Agnes Wambui', 7, 'Accounts', 'Head office', false),
+    member('tm-peter', 'Peter Kamau', 8, 'Operations Manager', 'Head office', false),
   ]
+  const ORGS = [
+    'KCB Bank',
+    'G4S Courier',
+    'Fine Interiors Ltd',
+    'Safaricom Business',
+    'Apex Surveyors',
+    'County Government',
+  ]
+  const PURPOSES: Record<string, string[]> = {
+    meeting: [
+      'Partnership discussion',
+      'Bank financing meeting',
+      'Contractor progress review',
+      'Legal documents signing',
+    ],
+    delivery: ['Documents delivery', 'Office supplies', 'Signed contracts pick-up'],
+    interview: ['Sales Executive interview', 'Accounts Assistant interview'],
+    other: ['Collecting a cheque', 'Site survey appointment', 'Personal visit'],
+  }
 
   // ~11 weeks of walk-ins inside office hours (Mon–Sat, 09:00–17:30).
   const walkIns: WalkIn[] = []
@@ -284,6 +317,17 @@ export function createSeed(): DemoDb {
     count = times.length
 
     times.forEach((t, i) => {
+      // About one in six visitors is not a client: meetings, deliveries, interviews…
+      const visitType =
+        rand() < 0.16
+          ? weighted<WalkIn['visitType']>(rand, [
+              ['meeting', 50],
+              ['delivery', 25],
+              ['interview', 15],
+              ['other', 10],
+            ])
+          : 'client'
+      const isClient = visitType === 'client'
       const returning = visitors.length > 20 && rand() < 0.09
       const visitor = returning
         ? visitors[Math.floor(rand() * visitors.length)]
@@ -305,7 +349,18 @@ export function createSeed(): DemoDb {
       ])
       const options = unitTypes.filter((u) => u.projectId === projectId)
       const unit = options[Math.floor(rand() * options.length)]
-      const sourceId = weighted(rand, sourceWeights)
+      const sourceId = isClient ? weighted(rand, sourceWeights) : null
+      const hostId = isClient
+        ? null
+        : visitType === 'interview'
+          ? 'tm-peter'
+          : weighted(rand, [
+              ['tm-daniel', 35],
+              ['tm-agnes', 25],
+              ['tm-peter', 20],
+              ['sp-lilian', 10],
+              ['sp-brian', 10],
+            ])
       const salesPersonId =
         sourceId === 's-sales'
           ? weighted(rand, [
@@ -326,10 +381,16 @@ export function createSeed(): DemoDb {
         fullName: visitor.name,
         phone: visitor.phone,
         email: visitor.email,
-        projectId,
-        unitTypeId: unit.id,
+        visitType,
+        projectId: isClient ? projectId : null,
+        unitTypeId: isClient ? unit.id : null,
         sourceId,
         salesPersonId,
+        hostId,
+        hostName: null,
+        organisation:
+          !isClient && visitType !== 'interview' && rand() < 0.75 ? ORGS[Math.floor(rand() * ORGS.length)] : null,
+        purpose: isClient ? null : PURPOSES[visitType][Math.floor(rand() * PURPOSES[visitType].length)],
         otherSourceText:
           sourceId === 's-other'
             ? weighted(rand, [
@@ -338,7 +399,7 @@ export function createSeed(): DemoDb {
                 ['Friend referral', 5],
               ])
             : null,
-        notes: rand() < 0.35 ? NOTES[Math.floor(rand() * NOTES.length)] : null,
+        notes: isClient && rand() < 0.35 ? NOTES[Math.floor(rand() * NOTES.length)] : null,
         consent: true,
         isReturning: returning,
         createdBy: createdBy.id,
@@ -348,12 +409,13 @@ export function createSeed(): DemoDb {
         deletedAt: null,
         deleteReason: null,
       })
-      if (salesPersonId) {
+      const recipientId = salesPersonId ?? hostId
+      if (recipientId) {
         for (const channel of ['email', 'whatsapp'] as const) {
           notifications.push({
             id: `n-${id}-${channel}`,
             walkInId: id,
-            salesPersonId,
+            recipientId,
             channel,
             status: 'sent',
             error: null,
@@ -400,7 +462,7 @@ export function createSeed(): DemoDb {
     projects,
     unitTypes,
     sources,
-    salesPersons,
+    team,
     settings: { ...DEFAULT_SETTINGS },
     walkIns,
     notifications,

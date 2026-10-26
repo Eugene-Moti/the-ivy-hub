@@ -16,6 +16,7 @@ import { z } from 'zod'
 import { useAuth } from '../auth/AuthProvider'
 import { ReceiptPrinter, type PrinterStage } from '../components/ReceiptPrinter'
 import { SourceIcon } from '../components/SourceIcon'
+import { VisitTypeIcon, visitTypeLabel } from '../components/VisitType'
 import { Button } from '../components/ui/Button'
 import { DynamicButton, type DynamicState } from '../components/ui/DynamicButton'
 import { Modal } from '../components/ui/Overlay'
@@ -188,9 +189,22 @@ export function WalkInPage() {
                     <UserSwitchIcon weight="duotone" className="mt-0.5 size-5 shrink-0 text-gold" />
                     <p className="text-sm text-fg">
                       <span className="font-semibold">Returning visitor</span> — last visited on{' '}
-                      {formatDate(returning.visitedAt)}, interested in{' '}
-                      {ref.project(returning.projectId)?.name ?? 'a project'}
-                      {ref.unitType(returning.unitTypeId) ? ` (${ref.unitType(returning.unitTypeId)!.name})` : ''}.
+                      {formatDate(returning.visitedAt)}
+                      {returning.visitType === 'client' ? (
+                        <>
+                          , interested in {ref.project(returning.projectId)?.name ?? 'a project'}
+                          {ref.unitType(returning.unitTypeId) ? ` (${ref.unitType(returning.unitTypeId)!.name})` : ''}.
+                        </>
+                      ) : (
+                        <>
+                          {' '}
+                          ({visitTypeLabel(returning.visitType).toLowerCase()}
+                          {returning.hostId || returning.hostName
+                            ? ` with ${ref.member(returning.hostId)?.fullName ?? returning.hostName}`
+                            : ''}
+                          ).
+                        </>
+                      )}
                       <span className="block text-xs text-muted">
                         You can still save; the record will be tagged “Returning”.
                       </span>
@@ -213,7 +227,7 @@ export function WalkInPage() {
                   <ShieldCheckIcon weight="duotone" className="size-4 text-gold" /> Data consent
                   <span className="text-gold">*</span>
                 </span>
-                The client consents to {companyName} storing their details for follow-up (Kenya Data Protection Act,
+                The visitor consents to {companyName} storing their details for follow-up (Kenya Data Protection Act,
                 2019).
               </span>
             </label>
@@ -427,12 +441,20 @@ function TodayPanel({ version }: { version: number }) {
           {rows?.map((w) => (
             <li key={w.id} className="flex items-center gap-3 px-6 py-3">
               <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-gold/10 text-gold">
-                <SourceIcon icon={ref.source(w.sourceId)?.icon ?? 'dots'} className="size-4" />
+                {w.visitType === 'client' ? (
+                  <SourceIcon icon={ref.source(w.sourceId)?.icon ?? 'dots'} className="size-4" />
+                ) : (
+                  <VisitTypeIcon type={w.visitType} className="size-4" />
+                )}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-fg">{w.fullName}</p>
                 <p className="truncate text-xs text-muted">
-                  {ref.project(w.projectId)?.name} · {ref.unitType(w.unitTypeId)?.name}
+                  {w.visitType === 'client'
+                    ? `${ref.project(w.projectId)?.name ?? ''} · ${ref.unitType(w.unitTypeId)?.name ?? ''}`
+                    : [visitTypeLabel(w.visitType), ref.member(w.hostId)?.fullName ?? w.hostName]
+                        .filter(Boolean)
+                        .join(' · ')}
                 </p>
               </div>
               <span className="text-xs font-semibold text-muted tabular-nums">{formatTime(w.visitedAt)}</span>

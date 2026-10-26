@@ -1,12 +1,12 @@
-import type { NewSalesPerson, NewWalkIn } from '../data/types'
+import type { NewTeamMember, NewWalkIn } from '../data/types'
 
 // Durable queue of writes made while offline, kept in IndexedDB so it survives reloads and restarts.
 
 export type OutboxItem =
   | {
       id: string
-      kind: 'sales_person'
-      payload: NewSalesPerson
+      kind: 'team_member'
+      payload: NewTeamMember
       queuedAt: string
       attempts: number
       lastError: string | null
@@ -56,7 +56,7 @@ export async function enqueue(item: Omit<OutboxItem, 'attempts' | 'lastError'>):
 export async function listOutbox(): Promise<OutboxItem[]> {
   const items = await tx<OutboxItem[]>('readonly', (s) => s.getAll() as IDBRequest<OutboxItem[]>)
   return items.sort((a, b) => {
-    if (a.kind !== b.kind) return a.kind === 'sales_person' ? -1 : 1
+    if (a.kind !== b.kind) return a.kind === 'team_member' ? -1 : 1
     return a.queuedAt.localeCompare(b.queuedAt)
   })
 }

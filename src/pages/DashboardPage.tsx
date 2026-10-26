@@ -16,19 +16,22 @@ import { ArrowDownRightIcon, ArrowUpRightIcon, ChartBarIcon, MinusIcon, TableIco
 import {
   bySource,
   byProjectUnit,
+  clientsOnly,
   dailyTrend,
   heatmap,
   inRange,
   kpis,
+  otherVisits,
   topSalesPersons,
 } from '../components/dashboard/aggregate'
+import { visitTypeLabel } from '../components/VisitType'
 import { rampColor, useChartTheme } from '../components/dashboard/chartTheme'
 import { PageLoader } from '../components/PageLoader'
 import { FilterSelect, inputClass } from '../components/ui/Field'
 import { Card, PageHeader, Segmented } from '../components/ui/Primitives'
 import { api } from '../data'
 import { useRefData } from '../data/RefDataProvider'
-import type { WalkIn } from '../data/types'
+import type { VisitType, WalkIn } from '../data/types'
 import { cn } from '../lib/cn'
 import { addDays, formatDayMonth, formatLongDate, eatDayStart, startOfMonth, todayKey } from '../lib/time'
 import { useSync } from '../offline/SyncProvider'
@@ -84,15 +87,19 @@ export function DashboardPage() {
   const data = ref.data
   const view = useMemo(() => {
     if (!rows || !data) return null
-    const inSel = inRange(rows, range.from, range.to)
+    // Marketing numbers count clients only; other visitors get their own card. The busiest-hours
+    // heatmap uses everyone, since it is about how busy reception is.
+    const everyone = inRange(rows, range.from, range.to)
+    const clients = clientsOnly(everyone)
     return {
-      total: inSel.length,
-      k: kpis(rows, today),
-      sources: bySource(inSel, data),
-      projects: byProjectUnit(inSel, data),
-      sales: topSalesPersons(inSel, data),
-      trend: dailyTrend(inSel, range.from, range.to, ref.settings),
-      heat: heatmap(inSel, ref.settings),
+      total: clients.length,
+      visitors: otherVisits(everyone),
+      k: kpis(clientsOnly(rows), today),
+      sources: bySource(clients, data),
+      projects: byProjectUnit(clients, data),
+      sales: topSalesPersons(clients, data),
+      trend: dailyTrend(clients, range.from, range.to, ref.settings),
+      heat: heatmap(everyone, ref.settings),
     }
   }, [rows, data, range.from, range.to, today, ref.settings])
 
@@ -145,7 +152,7 @@ export function DashboardPage() {
           {view && (
             <>
               {' · '}
-              <span className="font-semibold text-fg">{view.total}</span> walk-ins
+              <span className="font-semibold text-fg">{view.total}</span> client walk-ins
             </>
           )}
         </span>
@@ -157,7 +164,7 @@ export function DashboardPage() {
           <div className={cn('space-y-6 transition-opacity', fetching && 'opacity-70')}>
             <div className="grid gap-4 sm:grid-cols-3">
               <StatTile
-                label="Walk-ins today"
+                label="Client walk-ins today"
                 value={view.k.today.value}
                 previous={view.k.today.previous}
                 versus="vs this time last week"
@@ -183,10 +190,12 @@ export function DashboardPage() {
               <ProjectsCard groups={view.projects} />
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+            <div className="grid gap-6 lg:grid-cols-2">
               <SalesCard rows={view.sales} />
-              <HeatmapCard heat={view.heat} />
+              <VisitorsCard rows={view.visitors} />
             </div>
+
+            <HeatmapCard heat={view.heat} />
           </div>
         )}
       </PageLoader>
@@ -552,7 +561,7 @@ function ProjectsCard({
   )
 }
 
-function SalesCard({ rows }: { rows: { id: string; name: string; team: string | null; value: number }[] }) {
+function SalesCard({ rows }: { rows: { id: string; name: string; branch: string | null; value: number }[] }) {
   const t = useChartTheme()
   const max = Math.max(0, ...rows.map((r) => r.value))
   const total = rows.reduce((s, r) => s + r.value, 0)
@@ -567,9 +576,39 @@ function SalesCard({ rows }: { rows: { id: string; name: string; team: string | 
       ) : (
         <ol className="space-y-3">
           {rows.map((r) => (
-            <HBar key={r.id} label={r.name} sub={r.team} value={r.value} max={max} color={t.series} total={total} />
+            <HBar key={r.id} label={r.name} sub={r.branch} value={r.value} max={max} color={t.series} total={total} />
           ))}
         </ol>
+      )}
+    </ChartCard>
+  )
+}
+
+function VisitorsCard({ rows }: { rows: { type: VisitType; value: number }[] }) {
+  const t = useChartTheme()
+  const max = Math.max(0, ...rows.map((r) => r.value))
+  const total = rows.reduce((s, r) => s + r.value, 0)
+  return (
+    <ChartCard
+      title="Other visitors"
+      subtitle={`${total} non-client visit${total === 1 ? '' : 's'}: not counted in the marketing figures`}
+      table={[['Reason', 'Visits'], ...rows.map((r) => [visitTypeLabel(r.type), r.value])]}
+    >
+      {rows.length === 0 ? (
+        <EmptyChart />
+      ) : (
+        <ul className="space-y-3">
+          {rows.map((r) => (
+            <HBar
+              key={r.type}
+              label={visitTypeLabel(r.type)}
+              value={r.value}
+              max={max}
+              color={t.series}
+              total={total}
+            />
+          ))}
+        </ul>
       )}
     </ChartCard>
   )
@@ -583,8 +622,8 @@ function HeatmapCard({ heat }: { heat: ReturnType<typeof heatmap> }) {
       title="Busiest days and hours"
       subtitle={
         heat.outside
-          ? `Office hours only · ${heat.outside} walk-in${heat.outside === 1 ? '' : 's'} outside hours not shown`
-          : 'Office hours only'
+          ? `All visitors, office hours only · ${heat.outside} walk-in${heat.outside === 1 ? '' : 's'} outside hours not shown`
+          : 'All visitors, office hours only'
       }
       table={[
         ['Day', ...heat.hours.map((h) => `${String(h).padStart(2, '0')}:00`)],

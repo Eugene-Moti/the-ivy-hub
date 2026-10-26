@@ -23,7 +23,8 @@ import { Badge, Card, EmptyState, PageHeader } from '../components/ui/Primitives
 import { useToast } from '../components/ui/Toaster'
 import { api } from '../data'
 import { useRefData } from '../data/RefDataProvider'
-import type { WalkIn, WalkInFilters } from '../data/types'
+import type { VisitType, WalkIn, WalkInFilters } from '../data/types'
+import { VISIT_TYPES, VisitTypeIcon, visitTypeLabel } from '../components/VisitType'
 import { cn } from '../lib/cn'
 import { formatPhone } from '../lib/phone'
 import { addDays, formatDate, formatTime, startOfMonth, todayKey } from '../lib/time'
@@ -81,6 +82,7 @@ export function RecordsPage() {
   const [projectId, setProjectId] = useState('')
   const [unitTypeId, setUnitTypeId] = useState('')
   const [sourceId, setSourceId] = useState('')
+  const [visitType, setVisitType] = useState<VisitType | ''>('')
   const [salesPersonId, setSalesPersonId] = useState('')
   const [includeDeleted, setIncludeDeleted] = useState(false)
   const [page, setPage] = useState(0)
@@ -94,10 +96,22 @@ export function RecordsPage() {
       projectId: projectId || undefined,
       unitTypeId: unitTypeId || undefined,
       sourceId: sourceId || undefined,
+      visitType: visitType || undefined,
       salesPersonId: salesPersonId || undefined,
       includeDeleted: isAdmin && includeDeleted,
     }
-  }, [debouncedSearch, preset, custom, projectId, unitTypeId, sourceId, salesPersonId, includeDeleted, isAdmin])
+  }, [
+    debouncedSearch,
+    preset,
+    custom,
+    projectId,
+    unitTypeId,
+    sourceId,
+    visitType,
+    salesPersonId,
+    includeDeleted,
+    isAdmin,
+  ])
 
   const [rows, setRows] = useState<WalkIn[]>([])
   const [total, setTotal] = useState(0)
@@ -144,8 +158,11 @@ export function RecordsPage() {
   const projects = ref.data?.projects ?? []
   const unitTypes = (ref.data?.unitTypes ?? []).filter((u) => !projectId || u.projectId === projectId)
   const sources = ref.data?.sources ?? []
-  const salesPersons = [...(ref.data?.salesPersons ?? [])].sort((a, b) => a.fullName.localeCompare(b.fullName))
+  const team = [...(ref.data?.team ?? [])]
+    .filter((m) => m.isSalesPerson)
+    .sort((a, b) => a.fullName.localeCompare(b.fullName))
   const activeFilterCount = [
+    visitType,
     projectId,
     unitTypeId,
     sourceId,
@@ -161,6 +178,7 @@ export function RecordsPage() {
     setProjectId('')
     setUnitTypeId('')
     setSourceId('')
+    setVisitType('')
     setSalesPersonId('')
     setIncludeDeleted(false)
   }
@@ -251,6 +269,19 @@ export function RecordsPage() {
             <div className="flex flex-wrap items-center gap-2.5">
               <FunnelSimpleIcon weight="duotone" className="size-5 text-gold" />
               <FilterSelect
+                value={visitType}
+                onChange={(e) => setVisitType(e.target.value as VisitType | '')}
+                aria-label="Visit type"
+                className="w-auto"
+              >
+                <option value="">All visits</option>
+                {VISIT_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </FilterSelect>
+              <FilterSelect
                 value={projectId}
                 onChange={(e) => {
                   setProjectId(e.target.value)
@@ -299,7 +330,7 @@ export function RecordsPage() {
                 className="w-auto"
               >
                 <option value="">All sales persons</option>
-                {salesPersons.map((s) => (
+                {team.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.fullName}
                     {s.isActive ? '' : ' (inactive)'}
@@ -357,8 +388,8 @@ export function RecordsPage() {
                         'Name',
                         'Phone',
                         'Email',
-                        'Project',
-                        'Unit type',
+                        'Visit',
+                        'Interest / here to see',
                         'Source',
                         'Sales person',
                         'Recorded by',
@@ -409,18 +440,41 @@ export function RecordsPage() {
                             <td className="max-w-[200px] truncate px-4 py-3 text-fg/80">
                               {w.email ?? <span className="text-muted">—</span>}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-fg/90">{ref.project(w.projectId)?.name}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <Badge tone={w.visitType === 'client' ? 'gold' : 'neutral'}>
+                                <VisitTypeIcon type={w.visitType} />
+                                {visitTypeLabel(w.visitType)}
+                              </Badge>
+                            </td>
                             <td className="px-4 py-3 whitespace-nowrap text-fg/90">
-                              {ref.unitType(w.unitTypeId)?.name}
+                              {w.visitType === 'client' ? (
+                                <>
+                                  {ref.project(w.projectId)?.name}
+                                  <span className="block text-xs text-muted">{ref.unitType(w.unitTypeId)?.name}</span>
+                                </>
+                              ) : (
+                                <>
+                                  {ref.member(w.hostId)?.fullName ?? w.hostName ?? '—'}
+                                  {(w.organisation || w.purpose) && (
+                                    <span className="block max-w-[220px] truncate text-xs text-muted">
+                                      {[w.organisation, w.purpose].filter(Boolean).join(' · ')}
+                                    </span>
+                                  )}
+                                </>
+                              )}
                             </td>
                             <td className="px-4 py-3">
-                              <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-fg/90">
-                                <SourceIcon icon={src?.icon ?? 'dots'} className="size-4 text-gold" />
-                                {src?.name}
-                              </span>
+                              {src ? (
+                                <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-fg/90">
+                                  <SourceIcon icon={src.icon} className="size-4 text-gold" />
+                                  {src.name}
+                                </span>
+                              ) : (
+                                <span className="text-muted">—</span>
+                              )}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-fg/90">
-                              {ref.salesPerson(w.salesPersonId)?.fullName ?? <span className="text-muted">—</span>}
+                              {ref.member(w.salesPersonId)?.fullName ?? <span className="text-muted">—</span>}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-muted">{w.createdByName}</td>
                           </motion.tr>

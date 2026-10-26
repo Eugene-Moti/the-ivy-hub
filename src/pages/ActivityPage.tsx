@@ -13,9 +13,11 @@ import {
   type ActivityEntry,
   type ActivityFilters,
   type Profile,
+  type VisitType,
 } from '../data/types'
 import { cn } from '../lib/cn'
 import { formatPhone } from '../lib/phone'
+import { visitTypeLabel } from '../components/VisitType'
 import { formatDateTime } from '../lib/time'
 
 const PAGE_SIZE = 30
@@ -27,8 +29,8 @@ const ACTION_LABELS: Record<ActivityAction, string> = {
   walk_in_created: 'Walk-in created',
   walk_in_edited: 'Walk-in edited',
   walk_in_deleted: 'Walk-in deleted',
-  sales_person_added: 'Sales person added',
-  sales_person_edited: 'Sales person edited',
+  team_member_added: 'Team member added',
+  team_member_edited: 'Team member edited',
   settings_changed: 'Settings changed',
   user_created: 'User created',
   user_updated: 'User updated',
@@ -103,7 +105,8 @@ export function ActivityPage() {
     if (key === 'project_id') return ref.project(id)?.name ?? id
     if (key === 'unit_type_id') return ref.unitType(id)?.name ?? id
     if (key === 'source_id') return ref.source(id)?.name ?? id
-    if (key === 'sales_person_id') return ref.salesPerson(id)?.fullName ?? id
+    if (key === 'sales_person_id' || key === 'host_id' || key === 'recipient_id') return ref.member(id)?.fullName ?? id
+    if (key === 'visit_type') return visitTypeLabel(id as VisitType)
     if (key === 'phone' || key === 'whatsapp') return formatPhone(id)
     if (typeof value === 'object') return JSON.stringify(value)
     return id

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, type ReactNode } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router'
 import { AnimatePresence, motion } from 'motion/react'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
 import type { Role } from './auth/types'
@@ -11,14 +11,14 @@ import { AppShell } from './layouts/AppShell'
 import { ThemeProvider } from './lib/theme'
 import { SyncProvider } from './offline/SyncProvider'
 import { LoginPage } from './pages/LoginPage'
-import { ResetPasswordPage } from './pages/ResetPasswordPage'
+import { ChangePasswordPage, ResetPasswordPage } from './pages/PasswordPages'
 import { WalkInPage } from './pages/WalkInPage'
 
 // The receptionist's screens load with the app; heavier admin pages load on demand
 // (the service worker precaches them, so they still open offline).
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })))
 const RecordsPage = lazy(() => import('./pages/RecordsPage').then((m) => ({ default: m.RecordsPage })))
-const SalesPersonsPage = lazy(() => import('./pages/SalesPersonsPage').then((m) => ({ default: m.SalesPersonsPage })))
+const TeamPage = lazy(() => import('./pages/TeamPage').then((m) => ({ default: m.TeamPage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 const ActivityPage = lazy(() => import('./pages/ActivityPage').then((m) => ({ default: m.ActivityPage })))
 
@@ -61,7 +61,11 @@ function BootGate({ children }: { children: ReactNode }) {
 
 function RequireAuth({ children, roles }: { children: ReactNode; roles?: Role[] }) {
   const { user } = useAuth()
+  const location = useLocation()
   if (!user) return <Navigate to="/login" replace />
+  // Temporary passwords (seeded accounts, admin resets) must be replaced before anything else.
+  if (user.mustChangePassword && location.pathname !== '/change-password')
+    return <Navigate to="/change-password" replace />
   if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />
   return children
 }
@@ -93,6 +97,14 @@ export default function App() {
                       <Route path="/login" element={<LoginRoute />} />
                       <Route path="/reset-password" element={<ResetPasswordPage />} />
                       <Route
+                        path="/change-password"
+                        element={
+                          <RequireAuth>
+                            <ChangePasswordPage />
+                          </RequireAuth>
+                        }
+                      />
+                      <Route
                         element={
                           <RequireAuth>
                             <AppShell />
@@ -103,7 +115,7 @@ export default function App() {
                         <Route path="dashboard" element={adminOnly(<DashboardPage />)} />
                         <Route path="walk-ins/new" element={<WalkInPage />} />
                         <Route path="records" element={lazyPage(<RecordsPage />)} />
-                        <Route path="sales-persons" element={adminOnly(<SalesPersonsPage />)} />
+                        <Route path="team" element={adminOnly(<TeamPage />)} />
                         <Route path="settings" element={adminOnly(<SettingsPage />)} />
                         <Route path="activity" element={adminOnly(<ActivityPage />)} />
                       </Route>

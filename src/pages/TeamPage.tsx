@@ -16,35 +16,39 @@ import { inputClass } from '../components/ui/Field'
 import { HoldToConfirmButton } from '../components/ui/HoldToConfirmButton'
 import { Badge, Card, EmptyState, PageHeader, Segmented } from '../components/ui/Primitives'
 import { useToast } from '../components/ui/Toaster'
-import { SalesPersonFormModal } from '../components/walkin/SalesPersonFormModal'
+import { TeamMemberFormModal } from '../components/walkin/TeamMemberFormModal'
 import { api } from '../data'
 import { useRefData } from '../data/RefDataProvider'
-import type { SalesPerson } from '../data/types'
+import type { TeamMember } from '../data/types'
 import { cn } from '../lib/cn'
 import { formatPhone } from '../lib/phone'
 
 type StatusFilter = 'active' | 'inactive' | 'all'
 
-export function SalesPersonsPage() {
+export function TeamPage() {
   const ref = useRefData()
   const { toast } = useToast()
   const reduce = useReducedMotion()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<StatusFilter>('active')
-  const [editing, setEditing] = useState<SalesPerson | null>(null)
+  const [kind, setKind] = useState<'all' | 'sales' | 'staff'>('all')
+  const [editing, setEditing] = useState<TeamMember | null>(null)
   const [adding, setAdding] = useState(false)
 
   const people = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return [...(ref.data?.salesPersons ?? [])]
+    return [...(ref.data?.team ?? [])]
       .filter((p) => (status === 'all' ? true : status === 'active' ? p.isActive : !p.isActive))
-      .filter((p) => !q || `${p.fullName} ${p.email} ${p.team ?? ''} ${p.phone}`.toLowerCase().includes(q))
+      .filter((p) => (kind === 'all' ? true : kind === 'sales' ? p.isSalesPerson : !p.isSalesPerson))
+      .filter(
+        (p) => !q || `${p.fullName} ${p.email} ${p.title ?? ''} ${p.branch ?? ''} ${p.phone}`.toLowerCase().includes(q),
+      )
       .sort((a, b) => a.fullName.localeCompare(b.fullName))
-  }, [ref.data?.salesPersons, query, status])
+  }, [ref.data?.team, query, status, kind])
 
-  const setActive = async (p: SalesPerson, isActive: boolean, refresh = true) => {
+  const setActive = async (p: TeamMember, isActive: boolean, refresh = true) => {
     try {
-      await api.updateSalesPerson(p.id, { isActive })
+      await api.updateTeamMember(p.id, { isActive })
       if (refresh) await ref.refresh()
       if (isActive) toast({ title: `${p.fullName} reactivated`, tone: 'success' })
     } catch (err) {
@@ -57,11 +61,11 @@ export function SalesPersonsPage() {
     <div className="mx-auto max-w-[1280px]">
       <PageHeader
         eyebrow="Team"
-        title="Sales persons"
-        description="Everyone a walk-in can be assigned to. Deactivated people stay in history and reports."
+        title="Team"
+        description="Sales persons and the staff visitors come to see. Everyone here can be notified when their visitor arrives; deactivated people stay in history."
         actions={
           <Button variant="primary" onClick={() => setAdding(true)}>
-            <UserPlusIcon weight="bold" /> Add sales person
+            <UserPlusIcon weight="bold" /> Add team member
           </Button>
         }
       />
@@ -73,11 +77,21 @@ export function SalesPersonsPage() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name, team, phone…"
-            aria-label="Search sales persons"
+            placeholder="Search by name, title, branch, phone…"
+            aria-label="Search the team"
             className={cn(inputClass, 'h-10 rounded-lg pl-10 text-sm')}
           />
         </div>
+        <Segmented
+          ariaLabel="Role"
+          value={kind}
+          onChange={setKind}
+          options={[
+            { value: 'all', label: 'Everyone' },
+            { value: 'sales', label: 'Sales persons' },
+            { value: 'staff', label: 'Other staff' },
+          ]}
+        />
         <Segmented
           ariaLabel="Status"
           value={status}
@@ -94,7 +108,7 @@ export function SalesPersonsPage() {
         <Card>
           <EmptyState
             icon={<UsersThreeIcon />}
-            title="No sales persons here"
+            title="Nobody here yet"
             description="Try another search, or add someone new."
           />
         </Card>
@@ -121,7 +135,14 @@ export function SalesPersonsPage() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-semibold text-fg">{p.fullName}</p>
-                      <p className="truncate text-[13px] text-muted">{p.team ?? 'No team'}</p>
+                      <p className="truncate text-[13px] text-muted">
+                        {[p.title, p.branch].filter(Boolean).join(' · ') || 'No title'}
+                      </p>
+                      {p.isSalesPerson && (
+                        <Badge tone="gold" className="mt-1">
+                          Sales
+                        </Badge>
+                      )}
                     </div>
                     {p.isActive ? (
                       p.createdAt.startsWith('local:') ? (
@@ -170,8 +191,8 @@ export function SalesPersonsPage() {
         </div>
       )}
 
-      <SalesPersonFormModal open={adding} onClose={() => setAdding(false)} />
-      <SalesPersonFormModal open={Boolean(editing)} person={editing} onClose={() => setEditing(null)} />
+      <TeamMemberFormModal open={adding} onClose={() => setAdding(false)} />
+      <TeamMemberFormModal open={Boolean(editing)} person={editing} onClose={() => setEditing(null)} />
     </div>
   )
 }

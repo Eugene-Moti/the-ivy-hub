@@ -8,6 +8,8 @@ export interface Profile {
   role: Role
   title: string
   isActive: boolean
+  /** Set for seeded accounts and after an admin reset: the user must choose a new password at sign-in. */
+  mustChangePassword: boolean
   createdAt: string
 }
 
@@ -38,17 +40,24 @@ export interface LeadSource {
   sortOrder: number
 }
 
-export interface SalesPerson {
+/** Anyone a visitor can come to see. Sales persons are the members who can be assigned clients. */
+export interface TeamMember {
   id: string
   fullName: string
   phone: string
   whatsapp: string
   email: string
-  team: string | null
+  /** Job title, e.g. "Sales Executive", "CEO", "Accounts" */
+  title: string | null
+  branch: string | null
+  isSalesPerson: boolean
   isActive: boolean
   createdBy: string | null
   createdAt: string
 }
+
+/** Why someone walked in. Only "client" visits count towards marketing reports. */
+export type VisitType = 'client' | 'meeting' | 'delivery' | 'interview' | 'other'
 
 export interface AppSettings {
   companyName: string
@@ -69,11 +78,18 @@ export interface WalkIn {
   fullName: string
   phone: string
   email: string | null
-  projectId: string
-  unitTypeId: string
-  sourceId: string
+  visitType: VisitType
+  /** Client visits only */
+  projectId: string | null
+  unitTypeId: string | null
+  sourceId: string | null
   salesPersonId: string | null
   otherSourceText: string | null
+  /** Other visits: the team member they came to see, or a free-text name when not listed */
+  hostId: string | null
+  hostName: string | null
+  organisation: string | null
+  purpose: string | null
   notes: string | null
   consent: boolean
   isReturning: boolean
@@ -86,45 +102,37 @@ export interface WalkIn {
 }
 
 /** What the walk-in form submits. The id is generated on the client so offline retries never duplicate. */
-export interface NewWalkIn {
+export type WalkInDetails = Pick<
+  WalkIn,
+  | 'fullName'
+  | 'phone'
+  | 'email'
+  | 'visitType'
+  | 'projectId'
+  | 'unitTypeId'
+  | 'sourceId'
+  | 'salesPersonId'
+  | 'otherSourceText'
+  | 'hostId'
+  | 'hostName'
+  | 'organisation'
+  | 'purpose'
+  | 'notes'
+>
+
+export interface NewWalkIn extends WalkInDetails {
   id: string
   visitedAt: string
-  fullName: string
-  phone: string
-  email: string | null
-  projectId: string
-  unitTypeId: string
-  sourceId: string
-  salesPersonId: string | null
-  otherSourceText: string | null
-  notes: string | null
   consent: boolean
   isReturning: boolean
 }
 
-export type WalkInPatch = Partial<
-  Pick<
-    WalkIn,
-    | 'fullName'
-    | 'phone'
-    | 'email'
-    | 'projectId'
-    | 'unitTypeId'
-    | 'sourceId'
-    | 'salesPersonId'
-    | 'otherSourceText'
-    | 'notes'
-  >
->
+export type WalkInPatch = Partial<WalkInDetails>
 
-export interface NewSalesPerson {
-  id: string
-  fullName: string
-  phone: string
-  whatsapp: string
-  email: string
-  team: string | null
-}
+export type NewTeamMember = Pick<
+  TeamMember,
+  'id' | 'fullName' | 'phone' | 'whatsapp' | 'email' | 'title' | 'branch' | 'isSalesPerson'
+>
 
 export type NotificationChannel = 'email' | 'whatsapp'
 export type NotificationStatus = 'queued' | 'sent' | 'failed' | 'pending_setup'
@@ -132,7 +140,8 @@ export type NotificationStatus = 'queued' | 'sent' | 'failed' | 'pending_setup'
 export interface WalkInNotification {
   id: string
   walkInId: string
-  salesPersonId: string
+  /** The team member being told: the sales person (client visits) or the host (other visits) */
+  recipientId: string
   channel: NotificationChannel
   status: NotificationStatus
   error: string | null
@@ -148,8 +157,8 @@ export const ACTIVITY_ACTIONS = [
   'walk_in_created',
   'walk_in_edited',
   'walk_in_deleted',
-  'sales_person_added',
-  'sales_person_edited',
+  'team_member_added',
+  'team_member_edited',
   'settings_changed',
   'user_created',
   'user_updated',
@@ -178,7 +187,7 @@ export interface ReferenceData {
   projects: Project[]
   unitTypes: UnitType[]
   sources: LeadSource[]
-  salesPersons: SalesPerson[]
+  team: TeamMember[]
   settings: AppSettings
 }
 
@@ -187,6 +196,7 @@ export interface WalkInFilters {
   /** Inclusive 'YYYY-MM-DD' (Nairobi) */
   from?: string
   to?: string
+  visitType?: VisitType
   projectId?: string
   unitTypeId?: string
   sourceId?: string

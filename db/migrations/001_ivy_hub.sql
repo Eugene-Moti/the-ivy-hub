@@ -1,21 +1,51 @@
--- Ivy Hub: schema, permissions (RLS) and audit trail.
+-- Ivy Hub on Neon: schema, permissions (RLS) and audit trail.
+--
+-- Prerequisites (Neon Console): Better Auth enabled, then Postgres database → Data API enabled with
+-- "Use Neon Auth". That creates the `authenticated` / `anonymous` roles and the auth.user_id() function.
+--
 -- Permissions are enforced here, not just hidden in the UI. Every important change is written to
--- activity_log by triggers (security definer), so the log cannot be skipped or edited from the app.
+-- activity_log by security-definer triggers, so the log can't be skipped or edited from the app.
 
-create extension if not exists pgcrypto;
+do $$
+begin
+  if not exists (select 1 from pg_roles where rolname = 'authenticated') then
+    raise exception 'Enable the Neon Data API (with Neon Auth) before running this migration.';
+  end if;
+end $$;
+
+/* ------------------------------------------------------------------ */
+/* Who is calling?                                                      */
+/* ------------------------------------------------------------------ */
+
+-- The signed-in user's id from the Data API JWT (auth.user_id()), or, for our own server functions
+-- acting on someone's behalf, the `ivy.actor` setting. Null for system work. Never errors.
+create or replace function public.app_user_id() returns text
+language plpgsql stable as $$
+declare uid text;
+begin
+  begin
+    uid := auth.user_id();
+  exception when others then
+    uid := null;
+  end;
+  return coalesce(nullif(uid, ''), nullif(current_setting('ivy.actor', true), ''));
+end $$;
 
 /* ------------------------------------------------------------------ */
 /* Tables                                                               */
 /* ------------------------------------------------------------------ */
 
+-- One row per Neon Auth user who may use Ivy Hub. RLS checks this table, so an auth account
+-- without a profile (or with is_active = false) can't read or write anything.
 create table public.profiles (
-  id uuid primary key references auth.users (id) on delete cascade,
+  id text primary key, -- neon_auth user id
   name text not null check (length(trim(name)) >= 2),
   email text not null unique,
   username text not null unique check (username ~ '^[A-Za-z0-9._-]{3,}$'),
   role text not null check (role in ('admin', 'receptionist')),
   title text,
   is_active boolean not null default true,
+  must_change_password boolean not null default true,
   created_at timestamptz not null default now()
 );
 
@@ -61,16 +91,19 @@ create table public.lead_sources (
   created_at timestamptz not null default now()
 );
 
--- The client may supply the id (offline-created people sync with the id they were given).
-create table public.sales_persons (
+-- Sales persons and the other staff visitors come to see. The client may supply the id
+-- (people added offline sync with the id they were given).
+create table public.team_members (
   id uuid primary key default gen_random_uuid(),
   full_name text not null check (length(trim(full_name)) >= 2),
   phone text not null check (phone ~ '^\+[1-9][0-9]{7,14}$'),
   whatsapp text not null check (whatsapp ~ '^\+[1-9][0-9]{7,14}$'),
   email text not null check (email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
-  team text,
+  title text,
+  branch text,
+  is_sales_person boolean not null default true,
   is_active boolean not null default true,
-  created_by uuid references public.profiles (id) default auth.uid(),
+  created_by text references public.profiles (id) default public.app_user_id(),
   created_at timestamptz not null default now()
 );
 
@@ -82,30 +115,43 @@ create table public.walk_ins (
   full_name text not null check (length(trim(full_name)) >= 2),
   phone text not null check (phone ~ '^\+[1-9][0-9]{7,14}$'),
   email text check (email is null or email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
-  project_id uuid not null references public.projects (id),
-  unit_type_id uuid not null references public.unit_types (id),
-  source_id uuid not null references public.lead_sources (id),
-  sales_person_id uuid references public.sales_persons (id),
+  visit_type text not null default 'client' check (visit_type in ('client', 'meeting', 'delivery', 'interview', 'other')),
+  -- client visits
+  project_id uuid references public.projects (id),
+  unit_type_id uuid references public.unit_types (id),
+  source_id uuid references public.lead_sources (id),
+  sales_person_id uuid references public.team_members (id),
   other_source_text text,
+  -- other visits
+  host_id uuid references public.team_members (id),
+  host_name text,
+  organisation text check (organisation is null or char_length(organisation) <= 120),
+  purpose text check (purpose is null or char_length(purpose) <= 200),
   notes text check (notes is null or char_length(notes) <= 1000),
   consent boolean not null check (consent), -- Kenya Data Protection Act 2019
   is_returning boolean not null default false,
-  created_by uuid not null default auth.uid() references public.profiles (id),
+  created_by text not null default public.app_user_id() references public.profiles (id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   deleted_at timestamptz,
   delete_reason text,
+  constraint client_needs_interest check (
+    visit_type <> 'client' or (project_id is not null and unit_type_id is not null and source_id is not null)
+  ),
+  constraint visitor_needs_host check (visit_type = 'client' or host_id is not null or length(trim(coalesce(host_name, ''))) > 0),
   constraint delete_needs_reason check (deleted_at is null or length(trim(coalesce(delete_reason, ''))) > 0)
 );
 create index walk_ins_visited_at_idx on public.walk_ins (visited_at desc);
 create index walk_ins_phone_idx on public.walk_ins (phone);
 create index walk_ins_email_idx on public.walk_ins (lower(email));
 create index walk_ins_sales_person_idx on public.walk_ins (sales_person_id);
+create index walk_ins_visit_type_idx on public.walk_ins (visit_type, visited_at desc);
 
+-- One email + one WhatsApp per walk-in that names a sales person (client) or host (other visit).
 create table public.notifications (
   id uuid primary key default gen_random_uuid(),
   walk_in_id uuid not null references public.walk_ins (id) on delete cascade,
-  sales_person_id uuid not null references public.sales_persons (id),
+  recipient_id uuid not null references public.team_members (id),
   channel text not null check (channel in ('email', 'whatsapp')),
   status text not null default 'queued' check (status in ('queued', 'sent', 'failed', 'pending_setup')),
   error text,
@@ -119,7 +165,7 @@ create table public.notifications (
 
 create table public.activity_log (
   id bigint generated always as identity primary key,
-  user_id uuid,
+  user_id text,
   user_name text,
   action text not null,
   entity text,
@@ -151,23 +197,23 @@ create view public.walk_in_rows with (security_invoker = true) as
 
 create or replace function public.is_active_user() returns boolean
 language sql stable security definer set search_path = public as $$
-  select exists (select 1 from profiles where id = auth.uid() and is_active)
+  select exists (select 1 from profiles where id = app_user_id() and is_active)
 $$;
 
 create or replace function public.is_admin() returns boolean
 language sql stable security definer set search_path = public as $$
-  select exists (select 1 from profiles where id = auth.uid() and is_active and role = 'admin')
+  select exists (select 1 from profiles where id = app_user_id() and is_active and role = 'admin')
 $$;
 
 -- Only callable from other security-definer functions and triggers.
 create or replace function public.write_activity(p_action text, p_entity text, p_entity_id text, p_old jsonb, p_new jsonb)
 returns void language plpgsql security definer set search_path = public as $$
+declare uid text := app_user_id();
 begin
   insert into activity_log (user_id, user_name, action, entity, entity_id, old_values, new_values)
-  values (auth.uid(), (select name from profiles where id = auth.uid()), p_action, p_entity, p_entity_id,
+  values (uid, (select name from profiles where id = uid), p_action, p_entity, p_entity_id,
           nullif(p_old, '{}'::jsonb), nullif(p_new, '{}'::jsonb));
 end $$;
-revoke all on function public.write_activity(text, text, text, jsonb, jsonb) from public, anon, authenticated;
 
 -- Changed keys only, as {old}, {new}.
 create or replace function public.jsonb_changes(old_row jsonb, new_row jsonb, ignore text[] default '{updated_at}')
@@ -182,20 +228,41 @@ $$;
 /* Business rules                                                       */
 /* ------------------------------------------------------------------ */
 
-create or replace function public.walk_ins_apply_source_rules(w public.walk_ins) returns public.walk_ins
+-- Client visits need project/unit/source (+ sales person or free text, depending on the source);
+-- other visits need a host. Fields that don't apply to the visit type are cleared.
+create or replace function public.walk_ins_apply_rules(w public.walk_ins) returns public.walk_ins
 language plpgsql stable security definer set search_path = public as $$
 declare k text;
 begin
-  if not exists (select 1 from unit_types where id = w.unit_type_id and project_id = w.project_id) then
-    raise exception 'That unit type does not belong to the chosen project';
+  if w.visit_type = 'client' then
+    if w.project_id is null then raise exception 'Choose a project'; end if;
+    if w.unit_type_id is null then raise exception 'Choose a unit type'; end if;
+    if w.source_id is null then raise exception 'Choose how they heard about us'; end if;
+    if not exists (select 1 from unit_types where id = w.unit_type_id and project_id = w.project_id) then
+      raise exception 'That unit type does not belong to the chosen project';
+    end if;
+    select kind into k from lead_sources where id = w.source_id;
+    if k = 'sales_person' and w.sales_person_id is null then raise exception 'Choose the sales person'; end if;
+    if k = 'other' and length(trim(coalesce(w.other_source_text, ''))) = 0 then
+      raise exception 'Tell us where they heard about us';
+    end if;
+    if k is distinct from 'sales_person' then w.sales_person_id := null; end if;
+    if k is distinct from 'other' then w.other_source_text := null; end if;
+    w.host_id := null;
+    w.host_name := null;
+    w.organisation := null;
+    w.purpose := null;
+  else
+    if w.host_id is null and length(trim(coalesce(w.host_name, ''))) = 0 then
+      raise exception 'Who are they here to see?';
+    end if;
+    if w.host_id is not null then w.host_name := null; end if;
+    w.project_id := null;
+    w.unit_type_id := null;
+    w.source_id := null;
+    w.sales_person_id := null;
+    w.other_source_text := null;
   end if;
-  select kind into k from lead_sources where id = w.source_id;
-  if k = 'sales_person' and w.sales_person_id is null then raise exception 'Choose the sales person'; end if;
-  if k = 'other' and length(trim(coalesce(w.other_source_text, ''))) = 0 then
-    raise exception 'Tell us where they heard about us';
-  end if;
-  if k is distinct from 'sales_person' then w.sales_person_id := null; end if;
-  if k is distinct from 'other' then w.other_source_text := null; end if;
   return w;
 end $$;
 
@@ -203,14 +270,14 @@ create or replace function public.walk_ins_before_insert() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare prefix text; seq int;
 begin
-  if auth.uid() is not null then new.created_by := auth.uid(); end if;
+  if app_user_id() is not null then new.created_by := app_user_id(); end if;
   new.created_at := now();
   new.updated_at := now();
   new.deleted_at := null;
   new.delete_reason := null;
   -- visited_at comes from the client so offline records keep their real visit time.
   if new.visited_at > now() + interval '5 minutes' then raise exception 'The visit time cannot be in the future'; end if;
-  new := walk_ins_apply_source_rules(new);
+  new := walk_ins_apply_rules(new);
   new.is_returning := exists (
     select 1 from walk_ins w
     where w.deleted_at is null and w.id <> new.id
@@ -231,12 +298,12 @@ create trigger walk_ins_before_insert before insert on public.walk_ins
 create or replace function public.walk_ins_before_update() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  if auth.uid() is not null and not is_admin() then
+  if app_user_id() is not null and not is_admin() then
     if new.deleted_at is distinct from old.deleted_at or new.delete_reason is distinct from old.delete_reason then
       raise exception 'Only an admin can delete records';
     end if;
   end if;
-  if old.deleted_at is not null and auth.uid() is not null then
+  if old.deleted_at is not null and app_user_id() is not null then
     raise exception 'Deleted records cannot be changed';
   end if;
   -- Fields nobody may change after saving
@@ -247,7 +314,7 @@ begin
   new.visited_at := old.visited_at;
   new.consent := old.consent;
   new.is_returning := old.is_returning;
-  if new.deleted_at is null then new := walk_ins_apply_source_rules(new); end if;
+  if new.deleted_at is null then new := walk_ins_apply_rules(new); end if;
   new.updated_at := now();
   return new;
 end $$;
@@ -255,13 +322,14 @@ end $$;
 create trigger walk_ins_before_update before update on public.walk_ins
   for each row execute function public.walk_ins_before_update();
 
--- A walk-in that names a sales person queues an email and a WhatsApp (sent by the notify-walk-in function).
+-- Queue the arrival notifications (sent by the /api/notify function).
 create or replace function public.walk_ins_queue_notifications() returns trigger
 language plpgsql security definer set search_path = public as $$
+declare recipient uuid := case when new.visit_type = 'client' then new.sales_person_id else new.host_id end;
 begin
-  if new.sales_person_id is not null then
-    insert into notifications (walk_in_id, sales_person_id, channel)
-    values (new.id, new.sales_person_id, 'email'), (new.id, new.sales_person_id, 'whatsapp')
+  if recipient is not null then
+    insert into notifications (walk_in_id, recipient_id, channel)
+    values (new.id, recipient, 'email'), (new.id, recipient, 'whatsapp')
     on conflict do nothing;
   end if;
   return new;
@@ -270,23 +338,27 @@ end $$;
 create trigger walk_ins_queue_notifications after insert on public.walk_ins
   for each row execute function public.walk_ins_queue_notifications();
 
-create or replace function public.sales_persons_before_insert() returns trigger
+create or replace function public.team_members_before_insert() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  if auth.uid() is not null then new.created_by := auth.uid(); end if;
+  if app_user_id() is not null then new.created_by := app_user_id(); end if;
   new.created_at := now();
   new.is_active := true;
   return new;
 end $$;
 
-create trigger sales_persons_before_insert before insert on public.sales_persons
-  for each row execute function public.sales_persons_before_insert();
+create trigger team_members_before_insert before insert on public.team_members
+  for each row execute function public.team_members_before_insert();
 
 create or replace function public.profiles_guard() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  if new.id = auth.uid() and old.role = 'admin' and (not new.is_active or new.role <> 'admin') then
+  if new.id = app_user_id() and old.role = 'admin' and (not new.is_active or new.role <> 'admin') then
     raise exception 'You cannot deactivate or demote your own account';
+  end if;
+  -- Only the dedicated functions below may change these.
+  if app_user_id() is not null and current_setting('ivy.password_flow', true) is distinct from 'on' then
+    new.must_change_password := old.must_change_password;
   end if;
   new.email := old.email;
   new.created_at := old.created_at;
@@ -329,7 +401,8 @@ begin
       ent := 'walk_in';
       if tg_op = 'INSERT' then
         act := 'walk_in_created';
-        nv := jsonb_build_object('reference', n ->> 'reference', 'full_name', n ->> 'full_name', 'visited_at', n -> 'visited_at');
+        nv := jsonb_build_object('reference', n ->> 'reference', 'full_name', n ->> 'full_name',
+                                 'visit_type', n ->> 'visit_type', 'visited_at', n -> 'visited_at');
       elsif (o ->> 'deleted_at') is null and (n ->> 'deleted_at') is not null then
         act := 'walk_in_deleted';
         ov := jsonb_build_object('reference', o ->> 'reference', 'full_name', o ->> 'full_name');
@@ -338,13 +411,13 @@ begin
         act := 'walk_in_edited';
         ov := jsonb_build_object('reference', o ->> 'reference') || ov;
       end if;
-    when 'sales_persons' then
-      ent := 'sales_person';
+    when 'team_members' then
+      ent := 'team_member';
       if tg_op = 'INSERT' then
-        act := 'sales_person_added';
+        act := 'team_member_added';
         nv := n - 'id' - 'created_by' - 'created_at' - 'is_active';
       else
-        act := 'sales_person_edited';
+        act := 'team_member_edited';
         ov := jsonb_build_object('full_name', o ->> 'full_name') || ov;
       end if;
     when 'profiles' then
@@ -355,6 +428,8 @@ begin
       elsif (o ->> 'is_active')::boolean and not (n ->> 'is_active')::boolean then
         act := 'user_deactivated';
         ov := jsonb_build_object('name', o ->> 'name') || ov;
+      elsif nv ?& array['must_change_password'] and (nv - 'must_change_password') = '{}'::jsonb then
+        return new; -- password flag flips are logged by the password functions themselves
       else
         act := 'user_updated';
         ov := jsonb_build_object('name', o ->> 'name') || ov;
@@ -368,7 +443,8 @@ begin
       ent := 'notification';
       act := 'notification_' || (n ->> 'status');
       ov := '{}'::jsonb;
-      nv := jsonb_build_object('channel', n ->> 'channel', 'walk_in_id', n ->> 'walk_in_id', 'error', n ->> 'error', 'attempts', n -> 'attempts');
+      nv := jsonb_build_object('channel', n ->> 'channel', 'walk_in_id', n ->> 'walk_in_id',
+                               'recipient_id', n ->> 'recipient_id', 'error', n ->> 'error', 'attempts', n -> 'attempts');
     else
       ent := regexp_replace(tg_table_name, 's$', '');
       act := 'settings_changed';
@@ -381,7 +457,7 @@ begin
 end $$;
 
 create trigger audit_walk_ins after insert or update on public.walk_ins for each row execute function public.audit_trigger();
-create trigger audit_sales_persons after insert or update on public.sales_persons for each row execute function public.audit_trigger();
+create trigger audit_team_members after insert or update on public.team_members for each row execute function public.audit_trigger();
 create trigger audit_profiles after insert or update on public.profiles for each row execute function public.audit_trigger();
 create trigger audit_notifications after update on public.notifications for each row execute function public.audit_trigger();
 create trigger audit_projects after insert or update on public.projects for each row execute function public.audit_trigger();
@@ -389,7 +465,7 @@ create trigger audit_unit_types after insert or update on public.unit_types for 
 create trigger audit_lead_sources after insert or update on public.lead_sources for each row execute function public.audit_trigger();
 create trigger audit_app_settings after update on public.app_settings for each row execute function public.audit_trigger();
 
--- The log is append-only, even for the service role.
+-- The log is append-only, even for the database owner.
 create or replace function public.activity_log_immutable() returns trigger language plpgsql as $$
 begin
   raise exception 'The activity log is read-only';
@@ -400,13 +476,14 @@ create trigger activity_log_no_truncate before truncate on public.activity_log
   for each statement execute function public.activity_log_immutable();
 
 /* ------------------------------------------------------------------ */
-/* RPCs                                                                 */
+/* Login lockout (called only by the /api/login-guard server function)  */
 /* ------------------------------------------------------------------ */
 
--- Sign in with a username: look up the email (anon).
 create or replace function public.resolve_login_email(p_identifier text) returns text
 language sql stable security definer set search_path = public as $$
-  select email from profiles where lower(username) = lower(trim(p_identifier)) limit 1
+  select email from profiles
+  where lower(username) = lower(trim(p_identifier)) or lower(email) = lower(trim(p_identifier))
+  limit 1
 $$;
 
 create or replace function public.login_lock_status(p_identifier text) returns timestamptz
@@ -439,17 +516,18 @@ end $$;
 
 create or replace function public.clear_failed_logins(p_identifier text) returns void
 language sql security definer set search_path = public as $$
-  delete from login_attempts
-  where identifier = lower(trim(p_identifier))
-    and exists (select 1 from profiles where id = auth.uid()
-                and (lower(email) = lower(trim(p_identifier)) or lower(username) = lower(trim(p_identifier))))
+  delete from login_attempts where identifier = lower(trim(p_identifier))
 $$;
+
+/* ------------------------------------------------------------------ */
+/* RPCs for signed-in users (Data API)                                  */
+/* ------------------------------------------------------------------ */
 
 create or replace function public.log_session_event(p_action text, p_details jsonb default '{}') returns void
 language plpgsql security definer set search_path = public as $$
 begin
   if p_action not in ('login', 'logout') then raise exception 'Unsupported action'; end if;
-  if auth.uid() is null then return; end if;
+  if app_user_id() is null then return; end if;
   perform write_activity(p_action, 'session', null, null, p_details);
 end $$;
 
@@ -463,40 +541,63 @@ begin
     jsonb_build_object('format', p_format, 'row_count', p_row_count, 'filters', p_filters));
 end $$;
 
--- Called by the admin-users function (with the admin's own session) after a password reset.
-create or replace function public.log_admin_event(p_action text, p_user_id uuid) returns void
+-- The signed-in user has just changed their own password (in Neon Auth): lift the forced change.
+create or replace function public.complete_password_change() returns void
 language plpgsql security definer set search_path = public as $$
+declare uid text := app_user_id();
 begin
-  if not is_admin() then raise exception 'Only an admin can do that' using errcode = '42501'; end if;
-  if p_action <> 'password_reset' then raise exception 'Unsupported action'; end if;
-  perform write_activity(p_action, 'user', p_user_id::text, null,
-    jsonb_build_object('name', (select name from profiles where id = p_user_id)));
+  if uid is null or not is_active_user() then raise exception 'Not signed in' using errcode = '42501'; end if;
+  perform set_config('ivy.password_flow', 'on', true);
+  update profiles set must_change_password = false where id = uid;
+  perform write_activity('password_reset', 'user', uid, null,
+    jsonb_build_object('name', (select name from profiles where id = uid), 'self_service', true));
 end $$;
 
-revoke all on function public.resolve_login_email(text), public.login_lock_status(text), public.register_failed_login(text),
-  public.clear_failed_logins(text), public.log_session_event(text, jsonb), public.log_export(text, jsonb, int),
-  public.log_admin_event(text, uuid) from public;
-grant execute on function public.resolve_login_email(text), public.login_lock_status(text), public.register_failed_login(text)
-  to anon, authenticated;
-grant execute on function public.clear_failed_logins(text), public.log_session_event(text, jsonb),
-  public.log_export(text, jsonb, int), public.log_admin_event(text, uuid) to authenticated;
+-- An admin has set a temporary password for someone (in Neon Auth): force a change at next sign-in.
+create or replace function public.admin_mark_password_reset(p_user_id text) returns void
+language plpgsql security definer set search_path = public as $$
+declare target profiles;
+begin
+  if not is_admin() then raise exception 'Only an admin can do that' using errcode = '42501'; end if;
+  select * into target from profiles where id = p_user_id;
+  if target.id is null then raise exception 'User not found'; end if;
+  perform set_config('ivy.password_flow', 'on', true);
+  update profiles set must_change_password = true where id = p_user_id;
+  delete from login_attempts where identifier in (lower(target.email), lower(target.username));
+  perform write_activity('password_reset', 'user', p_user_id, null, jsonb_build_object('name', target.name));
+end $$;
 
 /* ------------------------------------------------------------------ */
-/* Row level security                                                   */
+/* Grants and row level security                                        */
 /* ------------------------------------------------------------------ */
+
+-- Functions are executable by PUBLIC by default; open only what each role needs.
+revoke execute on all functions in schema public from public, anonymous, authenticated;
+grant execute on function public.app_user_id(), public.is_active_user(), public.is_admin(), public.jsonb_changes(jsonb, jsonb, text[])
+  to authenticated;
+grant execute on function public.log_session_event(text, jsonb), public.log_export(text, jsonb, int),
+  public.complete_password_change(), public.admin_mark_password_reset(text) to authenticated;
+
+grant usage on schema public to authenticated;
+revoke all on all tables in schema public from anonymous, authenticated;
+grant select on all tables in schema public to authenticated;
+grant insert, update on public.profiles, public.projects, public.unit_types, public.lead_sources,
+  public.team_members, public.walk_ins to authenticated;
+grant update on public.app_settings to authenticated;
+revoke all on public.login_attempts from authenticated;
 
 alter table public.profiles enable row level security;
 alter table public.app_settings enable row level security;
 alter table public.projects enable row level security;
 alter table public.unit_types enable row level security;
 alter table public.lead_sources enable row level security;
-alter table public.sales_persons enable row level security;
+alter table public.team_members enable row level security;
 alter table public.walk_ins enable row level security;
 alter table public.notifications enable row level security;
 alter table public.activity_log enable row level security;
 alter table public.login_attempts enable row level security;
 
-create policy profiles_read on public.profiles for select to authenticated using (is_active_user() or id = auth.uid());
+create policy profiles_read on public.profiles for select to authenticated using (is_active_user() or id = app_user_id());
 create policy profiles_admin_insert on public.profiles for insert to authenticated with check (is_admin());
 create policy profiles_admin_update on public.profiles for update to authenticated using (is_admin()) with check (is_admin());
 
@@ -515,10 +616,10 @@ create policy sources_read on public.lead_sources for select to authenticated us
 create policy sources_admin_insert on public.lead_sources for insert to authenticated with check (is_admin());
 create policy sources_admin_update on public.lead_sources for update to authenticated using (is_admin()) with check (is_admin());
 
--- Receptionists can add sales persons from the walk-in form; only admins edit or deactivate them.
-create policy sales_persons_read on public.sales_persons for select to authenticated using (is_active_user());
-create policy sales_persons_insert on public.sales_persons for insert to authenticated with check (is_active_user());
-create policy sales_persons_admin_update on public.sales_persons for update to authenticated using (is_admin()) with check (is_admin());
+-- Receptionists can add sales persons from the walk-in form; only admins edit or deactivate team members.
+create policy team_read on public.team_members for select to authenticated using (is_active_user());
+create policy team_insert on public.team_members for insert to authenticated with check (is_active_user());
+create policy team_admin_update on public.team_members for update to authenticated using (is_admin()) with check (is_admin());
 
 create policy walk_ins_read on public.walk_ins for select to authenticated
   using (is_active_user() and (deleted_at is null or is_admin()));
@@ -529,17 +630,14 @@ create policy walk_ins_admin_update on public.walk_ins for update to authenticat
 -- Receptionists: their own records, within the edit window from Settings.
 create policy walk_ins_own_update on public.walk_ins for update to authenticated
   using (
-    is_active_user() and created_by = auth.uid() and deleted_at is null
+    is_active_user() and created_by = app_user_id() and deleted_at is null
     and created_at > now() - make_interval(hours => (select edit_window_hours from app_settings where id = 1))
   )
-  with check (created_by = auth.uid() and deleted_at is null);
+  with check (created_by = app_user_id() and deleted_at is null);
 
 create policy notifications_read on public.notifications for select to authenticated using (is_active_user());
 
 create policy activity_admin_read on public.activity_log for select to authenticated using (is_admin());
 
--- No delete policies anywhere: records are archived, never removed. login_attempts has no policies at all.
-revoke delete, truncate on all tables in schema public from anon, authenticated;
-revoke insert, update on public.activity_log, public.notifications, public.login_attempts from anon, authenticated;
-grant select on public.walk_in_rows to authenticated;
-revoke all on public.walk_in_rows from anon;
+-- No delete policies anywhere: records are archived, never removed. login_attempts has no policies:
+-- only the database owner (our server functions) touches it.

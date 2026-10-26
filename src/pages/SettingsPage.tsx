@@ -32,6 +32,7 @@ import { getDemoNotifyMode, resetDemoData, setDemoNotifyMode, type DemoNotifyMod
 import { useRefData } from '../data/RefDataProvider'
 import type { LeadSource, Profile, Project, Role, SourceKind, UnitType } from '../data/types'
 import { cn } from '../lib/cn'
+import { passwordRule } from '../lib/password'
 import { zodResolver } from '../lib/zodResolver'
 
 type Tab = 'general' | 'users' | 'projects' | 'sources' | 'notifications'
@@ -277,12 +278,6 @@ function GeneralSettings() {
 /* Users                                                                */
 /* ------------------------------------------------------------------ */
 
-const passwordRule = z
-  .string()
-  .min(8, 'At least 8 characters')
-  .regex(/[A-Za-z]/, 'Include a letter')
-  .regex(/\d/, 'Include a number')
-
 function suggestPassword() {
   const words = ['Ivy', 'Gold', 'Oak', 'Cedar', 'Maple', 'Acacia', 'Baobab']
   const w = words[Math.floor(Math.random() * words.length)]
@@ -343,6 +338,7 @@ function UsersSettings() {
                   {u.name}
                   {self && <Badge tone="gold">You</Badge>}
                   {!u.isActive && <Badge>Deactivated</Badge>}
+                  {u.isActive && u.mustChangePassword && <Badge tone="warning">Temporary password</Badge>}
                 </p>
                 <p className="truncate text-[13px] text-muted">
                   {u.email} · @{u.username}

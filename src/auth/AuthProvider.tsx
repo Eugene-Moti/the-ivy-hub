@@ -1,13 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api } from '../data'
-import { onSupabaseSignedOut } from '../data/supabase/supabaseApi'
 import { IDLE_TIMEOUT_MS } from '../lib/config'
 import { readJSON, remove, writeJSON } from '../lib/storage'
 import type { SessionUser, SignInResult, SignOutReason } from './types'
 
 const ACTIVITY_KEY = 'ivy.lastActivity'
 const PROFILE_KEY = 'ivy.profile'
-const SESSION_STORAGE_KEYS = ['ivy.demo.session', 'ivy.auth']
+const SESSION_STORAGE_KEYS = ['ivy.demo.session']
 const ACTIVITY_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart'] as const
 
 interface AuthContextValue {
@@ -20,6 +19,8 @@ interface AuthContextValue {
   /** Activates the session from signIn (lets the login screen finish its exit animation first). */
   commitSession: () => void
   signOut: (reason?: SignOutReason) => void
+  /** The forced (or voluntary) password change succeeded. */
+  markPasswordChanged: () => void
   /** Why the last session ended, so the login screen can explain an idle sign-out. */
   signOutReason: SignOutReason | null
 }
@@ -80,6 +81,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     pending.current = null
   }, [])
 
+  const markPasswordChanged = useCallback(() => {
+    setUser((u) => {
+      if (!u) return u
+      const next = { ...u, mustChangePassword: false }
+      writeJSON(PROFILE_KEY, next)
+      return next
+    })
+  }, [])
+
   const signOut = useCallback((reason: SignOutReason = 'manual') => {
     void api.signOut(reason).catch(() => {})
     remove(ACTIVITY_KEY)
@@ -115,16 +125,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (e.key && SESSION_STORAGE_KEYS.includes(e.key) && e.newValue === null) setUser(null)
     }
     window.addEventListener('storage', onStorage)
-    const unsubscribe = api.mode === 'supabase' ? onSupabaseSignedOut(() => setUser(null)) : () => {}
-    return () => {
-      window.removeEventListener('storage', onStorage)
-      unsubscribe()
-    }
+    return () => window.removeEventListener('storage', onStorage)
   }, [])
 
   return (
     <AuthContext.Provider
-      value={{ user, ready, isDemo: api.mode === 'demo', signIn, commitSession, signOut, signOutReason }}
+      value={{
+        user,
+        ready,
+        isDemo: api.mode === 'demo',
+        signIn,
+        commitSession,
+        signOut,
+        markPasswordChanged,
+        signOutReason,
+      }}
     >
       {children}
     </AuthContext.Provider>

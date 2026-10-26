@@ -14,7 +14,7 @@ import { useToast } from '../components/ui/Toaster'
 import { api } from '../data'
 import { isNetworkError } from '../data/api'
 import { useRefData } from '../data/RefDataProvider'
-import type { NewSalesPerson, NewWalkIn, SalesPerson, WalkIn, WalkInNotification } from '../data/types'
+import type { NewTeamMember, NewWalkIn, TeamMember, WalkIn, WalkInNotification } from '../data/types'
 import { compactDate } from '../lib/time'
 import { enqueue, listOutbox, markAttempt, removeFromOutbox, type OutboxItem } from './outbox'
 
@@ -49,7 +49,7 @@ interface SyncValue {
   pendingWalkIns: number
   syncing: boolean
   submitWalkIn: (input: NewWalkIn) => Promise<SubmitWalkInResult>
-  submitSalesPerson: (input: NewSalesPerson) => Promise<{ person: SalesPerson; queued: boolean }>
+  submitTeamMember: (input: NewTeamMember) => Promise<{ person: TeamMember; queued: boolean }>
   syncNow: () => Promise<number>
 }
 
@@ -62,7 +62,7 @@ export function provisionalReference(input: Pick<NewWalkIn, 'id' | 'visitedAt'>)
 export function SyncProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const { toast } = useToast()
-  const { refresh: refreshRefData, addLocalSalesPerson } = useRefData()
+  const { refresh: refreshRefData, addLocalMember } = useRefData()
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine)
   const [pending, setPending] = useState<OutboxItem[]>([])
   const [syncing, setSyncing] = useState(false)
@@ -80,8 +80,9 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     void reloadOutbox()
   }, [reloadOutbox])
 
-  const dispatchFor = useCallback((walkIn: Pick<WalkIn, 'id' | 'salesPersonId'>) => {
-    if (!walkIn.salesPersonId) return null
+  // Someone to notify: the sales person (client visits) or the host (other visits).
+  const dispatchFor = useCallback((walkIn: Pick<WalkIn, 'id' | 'salesPersonId' | 'hostId'>) => {
+    if (!walkIn.salesPersonId && !walkIn.hostId) return null
     return api.dispatchNotifications(walkIn.id).catch(() => [] as WalkInNotification[])
   }, [])
 
@@ -116,30 +117,30 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     [dispatchFor, reloadOutbox, user],
   )
 
-  const submitSalesPerson = useCallback(
-    async (input: NewSalesPerson) => {
+  const submitTeamMember = useCallback(
+    async (input: NewTeamMember) => {
       if (navigator.onLine) {
         try {
-          const person = await api.createSalesPerson(input)
-          addLocalSalesPerson(person)
+          const person = await api.createTeamMember(input)
+          addLocalMember(person)
           return { person, queued: false }
         } catch (err) {
           if (!isNetworkError(err)) throw err
         }
       }
-      await enqueue({ id: input.id, kind: 'sales_person', payload: input, queuedAt: new Date().toISOString() })
+      await enqueue({ id: input.id, kind: 'team_member', payload: input, queuedAt: new Date().toISOString() })
       await reloadOutbox()
       // "local:" marks it as unsynced so a refresh from the server does not drop it.
-      const person: SalesPerson = {
+      const person: TeamMember = {
         ...input,
         isActive: true,
         createdBy: user?.id ?? null,
         createdAt: `local:${new Date().toISOString()}`,
       }
-      addLocalSalesPerson(person)
+      addLocalMember(person)
       return { person, queued: true }
     },
-    [addLocalSalesPerson, reloadOutbox, user],
+    [addLocalMember, reloadOutbox, user],
   )
 
   const syncNow = useCallback(async () => {
@@ -151,8 +152,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     try {
       for (const item of await listOutbox()) {
         try {
-          if (item.kind === 'sales_person') {
-            await api.createSalesPerson(item.payload)
+          if (item.kind === 'team_member') {
+            await api.createTeamMember(item.payload)
             syncedPeople++
           } else {
             syncedWalkIns.push(await api.createWalkIn(item.payload))
@@ -197,10 +198,10 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       pendingWalkIns: pending.filter((p) => p.kind === 'walk_in').length,
       syncing,
       submitWalkIn,
-      submitSalesPerson,
+      submitTeamMember,
       syncNow,
     }),
-    [online, pending, syncing, submitWalkIn, submitSalesPerson, syncNow],
+    [online, pending, syncing, submitWalkIn, submitTeamMember, syncNow],
   )
 
   return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>

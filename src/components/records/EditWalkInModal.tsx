@@ -32,14 +32,19 @@ export function EditWalkInModal({
   useEffect(() => {
     if (!walkIn) return
     form.reset({
+      visitType: walkIn.visitType,
       fullName: walkIn.fullName,
       phone: formatPhone(walkIn.phone),
       email: walkIn.email ?? '',
-      projectId: walkIn.projectId,
-      unitTypeId: walkIn.unitTypeId,
-      sourceId: walkIn.sourceId,
+      projectId: walkIn.projectId ?? '',
+      unitTypeId: walkIn.unitTypeId ?? '',
+      sourceId: walkIn.sourceId ?? '',
       salesPersonId: walkIn.salesPersonId ?? '',
       otherSourceText: walkIn.otherSourceText ?? '',
+      hostId: walkIn.hostId ?? '',
+      hostName: walkIn.hostName ?? '',
+      organisation: walkIn.organisation ?? '',
+      purpose: walkIn.purpose ?? '',
       notes: walkIn.notes ?? '',
       consent: walkIn.consent,
     })
@@ -88,7 +93,7 @@ export function EditWalkInModal({
     >
       {walkIn && (
         <form id="edit-walk-in" noValidate onSubmit={form.handleSubmit(onSubmit)}>
-          <WalkInFields form={form} includeInactiveSalesPersonId={walkIn.salesPersonId} compact />
+          <WalkInFields form={form} includeInactiveMemberIds={[walkIn.salesPersonId, walkIn.hostId]} compact />
         </form>
       )}
     </Modal>

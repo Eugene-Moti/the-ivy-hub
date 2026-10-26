@@ -39,7 +39,9 @@ const migration = fs
   .sort()
   .map((f) => fs.readFileSync(path.join(root, 'db/migrations', f), 'utf8'))
   .join(String.fromCharCode(10))
-const seed = fs.readFileSync(path.join(root, 'db/seed.sql'), 'utf8')
+const seed = ['db/seed.sql', 'db/sample-data.sql']
+  .map((f) => fs.readFileSync(path.join(root, f), 'utf8'))
+  .join(String.fromCharCode(10))
 await check('migration', () => db.exec(migration))
 await check('seed', () => db.exec(seed))
 await check('seed is re-runnable', () => db.exec(seed))

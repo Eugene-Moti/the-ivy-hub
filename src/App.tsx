@@ -20,6 +20,7 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage').then((m) => ({ 
 const RecordsPage = lazy(() => import('./pages/RecordsPage').then((m) => ({ default: m.RecordsPage })))
 const TeamPage = lazy(() => import('./pages/TeamPage').then((m) => ({ default: m.TeamPage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
+const UsersPage = lazy(() => import('./pages/UsersPage').then((m) => ({ default: m.UsersPage })))
 const ActivityPage = lazy(() => import('./pages/ActivityPage').then((m) => ({ default: m.ActivityPage })))
 
 function RouteFallback() {
@@ -116,6 +117,7 @@ export default function App() {
                         <Route path="walk-ins/new" element={<WalkInPage />} />
                         <Route path="records" element={lazyPage(<RecordsPage />)} />
                         <Route path="team" element={adminOnly(<TeamPage />)} />
+                        <Route path="users" element={adminOnly(<UsersPage />)} />
                         <Route path="settings" element={adminOnly(<SettingsPage />)} />
                         <Route path="activity" element={adminOnly(<ActivityPage />)} />
                       </Route>

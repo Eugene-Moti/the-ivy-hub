@@ -4,8 +4,8 @@
 //
 // Reads from the environment / .env.local (never printed):
 //   DATABASE_URL, VITE_NEON_AUTH_URL, SEED_TEMP_PASSWORD
-//   SEED_ADMIN_EMAIL, SEED_ADMIN_NAME, [SEED_ADMIN_USERNAME]
-//   SEED_RECEPTIONIST_EMAIL, SEED_RECEPTIONIST_NAME, [SEED_RECEPTIONIST_USERNAME]
+//   SEED_ADMIN_EMAIL, SEED_ADMIN_NAME, [SEED_ADMIN_USERNAME], [SEED_ADMIN_TITLE]
+//   [SEED_RECEPTIONIST_EMAIL, SEED_RECEPTIONIST_NAME, SEED_RECEPTIONIST_USERNAME]  (optional)
 //   [SEED_ORIGIN] (defaults to http://localhost:5173; must be allowed in Neon → Better Auth → Domains)
 //
 // Run once, *before* turning off "Sign-up with Email" in the Neon Console:  npm run db:seed-users
@@ -38,7 +38,7 @@ const usernameFrom = (email) =>
 const people = [
   {
     role: 'admin',
-    title: 'Marketing Lead',
+    title: process.env.SEED_ADMIN_TITLE?.trim() || 'Marketing Lead',
     email: need('SEED_ADMIN_EMAIL').toLowerCase(),
     name: need('SEED_ADMIN_NAME'),
     username: process.env.SEED_ADMIN_USERNAME?.trim().toLowerCase(),
@@ -46,11 +46,14 @@ const people = [
   {
     role: 'receptionist',
     title: 'Receptionist',
-    email: need('SEED_RECEPTIONIST_EMAIL').toLowerCase(),
-    name: need('SEED_RECEPTIONIST_NAME'),
+    email: process.env.SEED_RECEPTIONIST_EMAIL?.trim().toLowerCase(),
+    name: process.env.SEED_RECEPTIONIST_NAME?.trim(),
     username: process.env.SEED_RECEPTIONIST_USERNAME?.trim().toLowerCase(),
   },
-].map((p) => ({ ...p, username: p.username || usernameFrom(p.email) }))
+]
+  // The receptionist is optional here: the admin can add them later in Settings → Users.
+  .filter((p) => p.email && p.name)
+  .map((p) => ({ ...p, username: p.username || usernameFrom(p.email) }))
 
 const db = new pg.Client({ connectionString: dbUrl })
 await db.connect()
@@ -110,7 +113,7 @@ try {
         : `• ${p.email}: profile already exists`,
     )
   }
-  console.log('\nBoth accounts sign in with SEED_TEMP_PASSWORD and must choose a new password straight away.')
+  console.log('\nSign in with SEED_TEMP_PASSWORD; you will be asked to choose your own password straight away.')
   console.log('Next: turn OFF "Sign-up with Email" in Neon → Better Auth so nobody else can register.')
 } catch (err) {
   console.error('Seeding failed:', err.message)

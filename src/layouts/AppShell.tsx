@@ -11,6 +11,7 @@ import {
   TableIcon,
   UserPlusIcon,
   UsersThreeIcon,
+  IdentificationCardIcon,
   type IconProps,
 } from '@phosphor-icons/react'
 import { useAuth } from '../auth/AuthProvider'
@@ -36,6 +37,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/walk-ins/new', label: 'New Walk-in', icon: UserPlusIcon, roles: ['admin', 'receptionist'] },
   { to: '/records', label: 'Records', icon: TableIcon, roles: ['admin', 'receptionist'] },
   { to: '/team', label: 'Team', icon: UsersThreeIcon, roles: ['admin'] },
+  { to: '/users', label: 'Users', icon: IdentificationCardIcon, roles: ['admin'] },
   { to: '/settings', label: 'Settings', icon: GearSixIcon, roles: ['admin'] },
   { to: '/activity', label: 'Activity Log', icon: ScrollIcon, roles: ['admin'] },
 ]

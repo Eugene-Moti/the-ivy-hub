@@ -21,59 +21,27 @@ login card, tap **Marketing Lead** (admin) or **Receptionist**.
 
 ## 2. Go live
 
-You'll need the Neon project (**The-ivy-hub**, AWS Europe Central 1), a Vercel account and this GitHub repo.
-**Keys and passwords never go into the code or chat.** Put them in `.env.local` on your computer (git-ignored)
-and in Vercel's Environment Variables.
+**Follow [docs/GO-LIVE.md](docs/GO-LIVE.md)**, a click-by-click guide. In short:
 
-### Step 1: Neon Console
+1. **Collect five values from Neon:** Auth URL, JWKS URL, Data API URL, connection string, and your site address.
+2. **Put them in `.env.local`** with the first admin's name, email and temporary password.
+3. **Run the setup commands:**
+   ```bash
+   npm install
+   npm run env:check      # checks your values and connections (never prints secrets)
+   npm run db:setup       # tables, permissions, audit trail + the "How did you hear about us?" list
+   npm run db:seed-users  # the first admin (and the receptionist, if SEED_RECEPTIONIST_* is filled in)
+   ```
+4. **Deploy on Vercel** with six environment variables:
+   - `VITE_NEON_AUTH_URL`
+   - `VITE_NEON_DATA_API_URL`
+   - `DATABASE_URL`
+   - `NEON_AUTH_JWKS_URL`
+   - `APP_URL`
+   - `CRON_SECRET`
+5. **Sign in as the admin** and set your own password. Then add the real projects (**Settings**), staff (**Team**) and the receptionist (**Users → New user**).
 
-1. **Better Auth** (already enabled) → **Domains**: add `https://<your-app>.vercel.app` (and your custom domain
-   later). Leave **Allow Localhost** on while setting up.
-2. **Postgres database → Data API** → enable it with **Use Neon Auth** ticked.
-3. Note these values (where each one goes is in the table below):
-   - **Better Auth → Configuration**: Auth URL and JWKS URL
-   - **Data API**: API URL
-   - **Connect**: the pooled connection string
-
-### Step 2: Environment variables
-
-Copy `.env.example` to `.env.local` and fill it in. Add the same variables in **Vercel → Project → Settings →
-Environment Variables**. The `SEED_*` values are only needed on your computer.
-
-| Variable                                                             | Secret?               | Where to get it                                                    |
-| -------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------ |
-| `VITE_NEON_AUTH_URL`                                                 | no                    | Neon → Better Auth → Configuration → Auth URL                      |
-| `VITE_NEON_DATA_API_URL`                                             | no                    | Neon → Postgres database → Data API → API URL (ends `/rest/v1`)    |
-| `DATABASE_URL`                                                       | **yes**               | Neon → Connect → pooled connection string                          |
-| `NEON_AUTH_JWKS_URL`                                                 | no                    | Neon → Better Auth → Configuration → JWKS URL                      |
-| `APP_URL`                                                            | no                    | Your site, e.g. `https://the-ivy-hub.vercel.app`                   |
-| `CRON_SECRET`                                                        | **yes**               | Any long random string                                             |
-| `EMAIL_PROVIDER`, `EMAIL_FROM`                                       | no                    | `sendgrid` (default) or `resend`, and a verified sender address    |
-| `SENDGRID_API_KEY` / `RESEND_API_KEY`                                | **yes**               | SendGrid → Settings → API Keys (or Resend → API Keys)              |
-| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`                            | SID no, token **yes** | Twilio Console → Account Info                                      |
-| `TWILIO_WHATSAPP_FROM`                                               | no                    | Sandbox `+14155238886`, or your approved WhatsApp number           |
-| `TWILIO_WHATSAPP_CONTENT_SID`, `TWILIO_WHATSAPP_VISITOR_CONTENT_SID` | no                    | Twilio → Content Template Builder (production only)                |
-| `SEED_TEMP_PASSWORD`                                                 | **yes**               | You choose: the first temporary password (local only)              |
-| `SEED_ADMIN_*`, `SEED_RECEPTIONIST_*`                                | no                    | The two people's names, emails and optional usernames (local only) |
-
-### Step 3: Create the database (on your computer)
-
-```bash
-npm run db:migrate -- --seed   # tables, permissions, audit trail + sample projects, sources and team
-npm run db:seed-users          # admin + receptionist, with SEED_TEMP_PASSWORD
-```
-
-Then, in Neon:
-
-- **Data API → Refresh schema cache**.
-- **Better Auth → Authentication**: turn **off** "Sign-up with Email", so only admins can create accounts.
-
-### Step 4: Deploy
-
-In Vercel, choose **Add New → Project** and import `Eugene-Moti/the-ivy-hub`. Vercel detects Vite (build `npm run build`,
-output `dist`). Add the environment variables, deploy, then add the Vercel URL to Neon's **Domains** if you haven't yet.
-
-**First sign-in:** both seeded accounts use the temporary password and are made to choose their own before they can do anything else.
+**Keys and passwords never go into the code or chat.** They live only in `.env.local` (git-ignored) and in Vercel.
 
 ## 3. WhatsApp and email (Twilio)
 
@@ -127,13 +95,13 @@ The form starts with **Reason for the visit**:
 
 ## 5. Changing passwords
 
-| Who                        | How                                                                                           |
-| -------------------------- | --------------------------------------------------------------------------------------------- |
-| Anyone signed in           | Top bar → key icon → **Change password**                                                      |
-| An admin, for another user | Settings → Users → **Reset password** → hold to confirm. They must change it at next sign-in. |
-| An admin who forgot theirs | Login → **Forgot password?** → email link (sent by Neon Auth) → `/reset-password`             |
-| A receptionist             | Ask an admin                                                                                  |
-| Locked out of every admin  | Neon Console → Better Auth → Users → set a password / **Make admin**                          |
+| Who                        | How                                                                                    |
+| -------------------------- | -------------------------------------------------------------------------------------- |
+| Anyone signed in           | Top bar → key icon → **Change password**                                               |
+| An admin, for another user | **Users** → **Reset password** → hold to confirm. They must change it at next sign-in. |
+| An admin who forgot theirs | Login → **Forgot password?** → email link (sent by Neon Auth) → `/reset-password`      |
+| A receptionist             | Ask an admin                                                                           |
+| Locked out of every admin  | Neon Console → Better Auth → Users → set a password / **Make admin**                   |
 
 New accounts and admin resets always start with a temporary password, and the app forces a change before anything
 else. Passwords need 8+ characters with a letter and a number. Every change is in the activity log.
@@ -178,8 +146,10 @@ Enforced by Postgres row-level security through the Neon Data API, not just hidd
 npm run dev                    # app + local /api functions (reads .env.local)
 npm run build                  # type-check (app, api, config) + production build
 npm run format                 # Prettier
-npm run db:migrate [-- --seed] # apply db/migrations (and sample lists)
-npm run db:seed-users          # first admin + receptionist (temporary password from SEED_TEMP_PASSWORD)
+npm run env:check              # check .env.local values and connections
+npm run db:setup [-- --samples] # create/upgrade the database (+ optional sample projects/team)
+npm run db:test                # permission checks in an in-memory Postgres
+npm run db:seed-users          # first admin (temporary password from SEED_TEMP_PASSWORD)
 ```
 
 ## 10. Project layout
@@ -192,7 +162,8 @@ src/
   offline/     IndexedDB outbox + sync
   pages/       Login, Walk-in, Records, Dashboard, Team, Settings, Activity log, password pages
 api/           Vercel functions: login-guard, notify, cron/notify-sweep (+ _lib)
-db/            migrations/001_ivy_hub.sql (schema, RLS, triggers) · seed.sql
-scripts/       db-migrate.mjs · seed-users.mjs · build-logo-assets.py
+db/            migrations/001_ivy_hub.sql (schema, RLS, triggers) · seed.sql (default lists) · sample-data.sql (optional)
+scripts/       db-migrate.mjs · seed-users.mjs · check-env.mjs · db-test.mjs · build-logo-assets.py
+docs/          GO-LIVE.md (step-by-step deployment)
 public/        sw.js, manifest, icons, textures, logo
 ```

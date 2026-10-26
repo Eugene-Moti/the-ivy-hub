@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// Applies db/migrations/*.sql in order (each once, tracked in public._migrations), then optionally
-// db/seed.sql. Reads DATABASE_URL from the environment / .env.local; never prints it.
+// Sets up the database: applies db/migrations/*.sql in order (each once, tracked in
+// public._migrations), then loads the default lists from db/seed.sql. Safe to run again.
+// Reads DATABASE_URL from the environment / .env.local; never prints it.
 //
-//   npm run db:migrate            # migrations only
-//   npm run db:migrate -- --seed  # migrations + sample lists
+//   npm run db:setup                 # tables, permissions, default lists
+//   npm run db:setup -- --samples    # ...plus sample projects and team, for trying things out
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -47,9 +48,12 @@ try {
     }
   }
 
-  if (process.argv.includes('--seed')) {
-    await client.query(fs.readFileSync(path.join(root, 'db/seed.sql'), 'utf8'))
-    console.log('✓ seed lists loaded (projects, unit types, sources, team)')
+  // Default lists (lead sources) are always safe to load: existing rows are never changed.
+  await client.query(fs.readFileSync(path.join(root, 'db/seed.sql'), 'utf8'))
+  console.log('✓ default lists ready ("How did you find out about us?" options)')
+  if (process.argv.includes('--samples')) {
+    await client.query(fs.readFileSync(path.join(root, 'db/sample-data.sql'), 'utf8'))
+    console.log('✓ sample projects and team loaded (placeholder numbers: replace before going live)')
   }
   console.log('\nDone. In the Neon Console, open Data API and click "Refresh schema cache".')
 } catch (err) {

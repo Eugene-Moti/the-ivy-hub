@@ -14,7 +14,6 @@ import {
   SparkleIcon,
   UserMinusIcon,
   UserPlusIcon,
-  UsersIcon,
   WarningCircleIcon,
   WhatsappLogoIcon,
 } from '@phosphor-icons/react'
@@ -35,7 +34,7 @@ import { cn } from '../lib/cn'
 import { passwordRule } from '../lib/password'
 import { zodResolver } from '../lib/zodResolver'
 
-type Tab = 'general' | 'users' | 'projects' | 'sources' | 'notifications'
+type Tab = 'general' | 'projects' | 'sources' | 'notifications'
 
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>('general')
@@ -44,7 +43,7 @@ export function SettingsPage() {
       <PageHeader
         eyebrow="Admin"
         title="Settings"
-        description="Company details, users and the lists used on the walk-in form."
+        description="Company details, office hours and the lists used on the walk-in form."
       />
       <Segmented
         ariaLabel="Settings sections"
@@ -57,14 +56,6 @@ export function SettingsPage() {
             label: (
               <>
                 <GearSixIcon weight="bold" /> General
-              </>
-            ),
-          },
-          {
-            value: 'users',
-            label: (
-              <>
-                <UsersIcon weight="bold" /> Users
               </>
             ),
           },
@@ -95,7 +86,6 @@ export function SettingsPage() {
         ]}
       />
       {tab === 'general' && <GeneralSettings />}
-      {tab === 'users' && <UsersSettings />}
       {tab === 'projects' && <ProjectsSettings />}
       {tab === 'sources' && <SourcesSettings />}
       {tab === 'notifications' && <NotificationSettings />}
@@ -285,7 +275,7 @@ function suggestPassword() {
   return `${w}#${n}${String.fromCharCode(97 + (n % 26))}`
 }
 
-function UsersSettings() {
+export function UsersSettings() {
   const { user: me } = useAuth()
   const { toast } = useToast()
   const [users, setUsers] = useState<Profile[] | null>(null)
@@ -313,8 +303,8 @@ function UsersSettings() {
 
   return (
     <Section
-      title="Users"
-      description="Only admins can create accounts. Deactivated users cannot sign in; their history is kept."
+      title="Accounts"
+      description="Only admins can create accounts. New users get a temporary password and must choose their own at first sign-in. Deactivated users cannot sign in; their history is kept."
       actions={
         <Button variant="primary" onClick={() => setCreateOpen(true)}>
           <UserPlusIcon weight="bold" /> New user

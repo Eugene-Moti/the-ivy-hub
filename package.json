@@ -10,9 +10,10 @@
     "typecheck": "tsc -b",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "db:migrate": "node --env-file-if-exists=.env.local scripts/db-migrate.mjs",
     "db:seed-users": "node --env-file-if-exists=.env.local scripts/seed-users.mjs",
-    "db:test": "node scripts/db-test.mjs"
+    "db:test": "node scripts/db-test.mjs",
+    "db:setup": "node --env-file-if-exists=.env.local scripts/db-migrate.mjs",
+    "env:check": "node --env-file-if-exists=.env.local scripts/check-env.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.11",

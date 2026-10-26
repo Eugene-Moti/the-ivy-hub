@@ -85,7 +85,11 @@ const dateFmt = new Intl.DateTimeFormat('en-KE', {
 })
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
-const first = (name: string) => name.split(' ')[0]
+/** "Faith Njeri" → "Faith"; titles stay with the name: "Dr Achieng Oduor" → "Dr Achieng". */
+const first = (name: string) => {
+  const [a, b] = name.trim().split(/\s+/)
+  return /^(mr|mrs|ms|miss|dr|eng|prof|pastor|hon)\.?$/i.test(a) && b ? `${a} ${b}` : a
+}
 const at = (c: Context) => timeFmt.format(new Date(c.visitor.visitedAt))
 
 export async function loadContext(walkInId: string, recipientId: string): Promise<Context> {

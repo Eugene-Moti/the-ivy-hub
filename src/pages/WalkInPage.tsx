@@ -15,6 +15,8 @@ import {
 import { z } from 'zod'
 import { useAuth } from '../auth/AuthProvider'
 import { ReceiptPrinter, type PrinterStage } from '../components/ReceiptPrinter'
+import { StaffDirectoryButton } from '../components/StaffDirectory'
+import { NotifyContact } from '../components/walkin/NotifyContact'
 import { SourceIcon } from '../components/SourceIcon'
 import { VisitTypeIcon, visitTypeLabel } from '../components/VisitType'
 import { Button } from '../components/ui/Button'
@@ -164,6 +166,7 @@ export function WalkInPage() {
         eyebrow="Reception"
         title="New walk-in"
         description="Record each visitor as they arrive. Fields marked * are required."
+        actions={<StaffDirectoryButton />}
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -313,6 +316,9 @@ export function WalkInPage() {
               queued={queued}
             />
           </ReceiptPrinter>
+        )}
+        {receipt?.stage === 'complete' && slipWalkIn && (
+          <NotifyContact walkIn={slipWalkIn} labels={labels} className="mt-5" />
         )}
       </Modal>
 

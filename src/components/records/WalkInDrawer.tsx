@@ -23,6 +23,7 @@ import { Drawer } from '../ui/Overlay'
 import { Badge, usePrint } from '../ui/Primitives'
 import { useToast } from '../ui/Toaster'
 import { ChannelIcon, PrintableSlip, PrintableVisitorPass, useWalkInLabels, VisitorPass } from '../walkin/WalkInDocs'
+import { NotifyContact } from '../walkin/NotifyContact'
 import { EditWalkInModal } from './EditWalkInModal'
 
 interface Props {
@@ -193,6 +194,8 @@ export function WalkInDrawer({ walkIn, onClose, onChanged }: Props) {
               </div>
             )}
           </dl>
+
+          {!w.deletedAt && <NotifyContact walkIn={w} labels={labels} />}
 
           {(w.salesPersonId || w.hostId) && (
             <section>

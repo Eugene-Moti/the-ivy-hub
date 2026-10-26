@@ -16,6 +16,7 @@ import {
 import { useAuth } from '../auth/AuthProvider'
 import type { Role } from '../auth/types'
 import { IvyLogo } from '../components/IvyLogo'
+import { StaffDirectoryButton } from '../components/StaffDirectory'
 import { StatusPill } from '../components/StatusPill'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { useRefData } from '../data/RefDataProvider'
@@ -153,6 +154,7 @@ export function AppShell() {
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <StatusPill />
+            <StaffDirectoryButton compact />
             <ThemeToggle />
             <div className="hidden items-center gap-3 rounded-full border border-line bg-bg-elevated/70 py-1 pr-4 pl-1 sm:flex">
               <span className="grid size-8 place-items-center rounded-full bg-gradient-to-br from-gold-300 to-gold-600 text-xs font-bold text-ink-900">

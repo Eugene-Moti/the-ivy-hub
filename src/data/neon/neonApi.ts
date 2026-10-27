@@ -196,8 +196,10 @@ async function callApi<T>(path: string, body: Record<string, unknown>, auth = tr
   }
   const res = await fetch(`/api/${path}`, { method: 'POST', headers, body: JSON.stringify(body) })
   const payload = await res.json().catch(() => ({}))
-  if (!res.ok)
-    throw new ApiError(payload.error ?? `Request failed (${res.status})`, res.status === 403 ? 'forbidden' : 'invalid')
+  if (!res.ok) {
+    const code = res.status === 403 ? 'forbidden' : res.status >= 500 ? 'unknown' : 'invalid'
+    throw new ApiError(payload.error ?? `Request failed (${res.status})`, code)
+  }
   return payload as T
 }
 
@@ -233,6 +235,19 @@ async function loadProfile(userId: string): Promise<Profile | null> {
   return res.data ? toProfile(res.data) : null
 }
 
+/** Right after sign-in, or while Neon wakes from idle, the first read can fail or come back empty: retry briefly. */
+async function loadProfileWithRetry(userId: string): Promise<Profile | null> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const profile = await loadProfile(userId)
+      if (profile || attempt === 3) return profile
+    } catch (err) {
+      if (attempt === 3) throw err
+    }
+    await new Promise((resolve) => setTimeout(resolve, 700 * attempt))
+  }
+}
+
 const nowIso = () => new Date().toISOString()
 
 export const neonApi: Api = {
@@ -250,7 +265,7 @@ export const neonApi: Api = {
       await neon.auth.signOut().catch(() => {})
       return null
     }
-    const profile = await loadProfile(user.id)
+    const profile = await loadProfileWithRetry(user.id)
     if (!profile?.isActive) {
       await neon.auth.signOut().catch(() => {})
       return null
@@ -264,9 +279,10 @@ export const neonApi: Api = {
     try {
       guard = await callApi('login-guard', { action: 'check', identifier: id }, false)
     } catch (err) {
-      return err instanceof ApiError
+      if (!(err instanceof ApiError)) return { ok: false, reason: 'offline' }
+      return err.code === 'invalid'
         ? { ok: false, reason: 'invalid', attemptsLeft: MAX_FAILED_ATTEMPTS }
-        : { ok: false, reason: 'offline' }
+        : { ok: false, reason: 'unavailable' }
     }
     if (guard.lockedUntil) return { ok: false, reason: 'locked', lockedUntil: new Date(guard.lockedUntil).getTime() }
 
@@ -292,10 +308,18 @@ export const neonApi: Api = {
         return { ok: false, reason: 'inactive' }
       }
       if (!result.error.status) return { ok: false, reason: 'offline' }
+      // Rate limits and server errors say nothing about the password, so they don't count as a strike.
+      if (result.error.status === 429 || result.error.status >= 500) return { ok: false, reason: 'unavailable' }
       return registerFailure()
     }
 
-    const profile = await loadProfile(result.data.user.id).catch(() => null)
+    let profile: Profile | null
+    try {
+      profile = await loadProfileWithRetry(result.data.user.id)
+    } catch {
+      await neon.auth.signOut().catch(() => {})
+      return { ok: false, reason: 'unavailable' }
+    }
     if (!profile?.isActive) {
       await neon.auth.signOut().catch(() => {})
       return { ok: false, reason: 'inactive' }

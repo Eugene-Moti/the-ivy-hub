@@ -9,5 +9,6 @@ export type SignInResult =
   | { ok: false; reason: 'locked'; lockedUntil: number }
   | { ok: false; reason: 'inactive' }
   | { ok: false; reason: 'offline' }
+  | { ok: false; reason: 'unavailable' }
 
 export type SignOutReason = 'manual' | 'idle'

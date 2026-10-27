@@ -283,6 +283,8 @@ function SignInView({ onForgot, onFailure }: { onForgot: () => void; onFailure: 
       setError('This account has been deactivated. Please contact your admin.')
     } else if (result.reason === 'offline') {
       setError("Can't reach the server. Check the internet connection and try again.")
+    } else if (result.reason === 'unavailable') {
+      setError('The server is busy or waking up. Wait a few seconds and try again.')
     } else {
       const warn =
         result.attemptsLeft <= 3

@@ -32,6 +32,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
+    // Phone status bar / browser chrome follows the theme.
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', theme === 'dark' ? '#0E1512' : '#F8F5EE')
   }, [theme])
 
   const setPref = useCallback((next: ThemePref) => {

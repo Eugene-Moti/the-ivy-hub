@@ -2,7 +2,7 @@ import { useId, type ComponentProps, type ReactNode, type Ref } from 'react'
 import { cn } from '../../lib/cn'
 
 export const inputClass =
-  'w-full rounded-xl border border-line bg-field px-3.5 text-[15px] text-fg outline-none transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-muted/70 hover:border-gold/45 focus:border-focus focus:shadow-glow disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-rose/70'
+  'w-full rounded-xl border border-line bg-field px-3.5 text-base text-fg sm:text-[15px] outline-none transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-muted/70 hover:border-gold/45 focus:border-focus focus:shadow-glow disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-rose/70'
 
 interface FieldProps {
   label: ReactNode
@@ -68,7 +68,7 @@ export function Select({ className, ref, ...props }: ComponentProps<'select'> & 
 export function FilterSelect({ className, ...props }: ComponentProps<'select'>) {
   return (
     <select
-      className={cn(inputClass, 'ivy-select h-10 cursor-pointer rounded-lg pr-9 text-sm', className)}
+      className={cn(inputClass, 'ivy-select h-10 cursor-pointer rounded-lg pr-9 text-base sm:text-sm', className)}
       {...props}
     />
   )

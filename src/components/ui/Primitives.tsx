@@ -19,11 +19,17 @@ export function PageHeader({
   actions?: ReactNode
 }) {
   return (
-    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-4 sm:mb-8">
       <div className="min-w-0">
-        {eyebrow && <p className="mb-1.5 text-xs font-semibold tracking-[0.2em] text-link uppercase">{eyebrow}</p>}
-        <h1 className="font-display text-[2.15rem] leading-tight font-medium tracking-[-0.01em] text-fg">{title}</h1>
-        {description && <p className="mt-1.5 max-w-2xl text-sm text-muted">{description}</p>}
+        {eyebrow && (
+          <p className="mb-1 text-[11px] font-semibold tracking-[0.2em] text-link uppercase sm:mb-1.5 sm:text-xs">
+            {eyebrow}
+          </p>
+        )}
+        <h1 className="font-display text-[1.85rem] leading-tight font-medium tracking-[-0.01em] text-fg sm:text-[2.15rem]">
+          {title}
+        </h1>
+        {description && <p className="mt-1 max-w-2xl text-sm text-muted sm:mt-1.5">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>

@@ -85,6 +85,7 @@ export function RecordsPage() {
   const [visitType, setVisitType] = useState<VisitType | ''>('')
   const [salesPersonId, setSalesPersonId] = useState('')
   const [includeDeleted, setIncludeDeleted] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [page, setPage] = useState(0)
   const debouncedSearch = useDebounced(search, 300)
 
@@ -191,7 +192,7 @@ export function RecordsPage() {
       <PageHeader
         eyebrow="Walk-ins"
         title="Records"
-        description="Every walk-in, newest first. Click a row for details."
+        description="Every walk-in, newest first. Tap one for details."
         actions={
           <>
             <div className="flex items-center gap-2 rounded-xl border border-gold/30 bg-gold/10 px-4 py-2">
@@ -227,16 +228,34 @@ export function RecordsPage() {
                   type="search"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search name, phone, email or reference…"
+                  placeholder="Search name, phone or ref…"
                   aria-label="Search records"
-                  className={cn(inputClass, 'h-10 rounded-lg pl-10 text-sm')}
+                  className={cn(inputClass, 'h-11 rounded-lg pl-10 text-base sm:h-10 sm:text-sm')}
                 />
               </div>
+              <button
+                type="button"
+                onClick={() => setFiltersOpen((o) => !o)}
+                aria-expanded={filtersOpen}
+                aria-controls="records-filters"
+                className={cn(
+                  'relative grid size-11 shrink-0 place-items-center rounded-lg border focus-ring transition-colors md:hidden',
+                  filtersOpen || activeFilterCount ? 'border-gold/60 bg-gold/10 text-link' : 'border-line text-muted',
+                )}
+                aria-label={`Filters${activeFilterCount ? ` (${activeFilterCount} on)` : ''}`}
+              >
+                <FunnelSimpleIcon weight={activeFilterCount ? 'fill' : 'bold'} className="size-5" />
+                {activeFilterCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full bg-gold text-[11px] font-bold text-ink-900">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
               <FilterSelect
                 value={preset}
                 onChange={(e) => setPreset(e.target.value as Preset)}
                 aria-label="Date range"
-                className="w-auto"
+                className={cn('w-full sm:w-auto', !filtersOpen && 'max-md:hidden')}
               >
                 {PRESETS.map((p) => (
                   <option key={p.value} value={p.value}>
@@ -245,14 +264,14 @@ export function RecordsPage() {
                 ))}
               </FilterSelect>
               {preset === 'custom' && (
-                <div className="flex items-center gap-2">
+                <div className={cn('flex w-full items-center gap-2 sm:w-auto', !filtersOpen && 'max-md:hidden')}>
                   <input
                     type="date"
                     aria-label="From date"
                     value={custom.from ?? ''}
                     max={custom.to}
                     onChange={(e) => setCustom((c) => ({ ...c, from: e.target.value || undefined }))}
-                    className={cn(inputClass, 'h-10 w-auto rounded-lg text-sm')}
+                    className={cn(inputClass, 'h-10 min-w-0 flex-1 rounded-lg text-sm sm:w-auto sm:flex-none')}
                   />
                   <span className="text-muted">–</span>
                   <input
@@ -261,18 +280,24 @@ export function RecordsPage() {
                     value={custom.to ?? ''}
                     min={custom.from}
                     onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value || undefined }))}
-                    className={cn(inputClass, 'h-10 w-auto rounded-lg text-sm')}
+                    className={cn(inputClass, 'h-10 min-w-0 flex-1 rounded-lg text-sm sm:w-auto sm:flex-none')}
                   />
                 </div>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-2.5">
-              <FunnelSimpleIcon weight="duotone" className="size-5 text-gold" />
+            <div
+              id="records-filters"
+              className={cn(
+                'grid grid-cols-2 items-center gap-2.5 md:flex md:flex-wrap',
+                !filtersOpen && 'max-md:hidden',
+              )}
+            >
+              <FunnelSimpleIcon weight="duotone" className="hidden size-5 text-gold md:block" />
               <FilterSelect
                 value={visitType}
                 onChange={(e) => setVisitType(e.target.value as VisitType | '')}
                 aria-label="Visit type"
-                className="w-auto"
+                className="w-full md:w-auto"
               >
                 <option value="">All visits</option>
                 {VISIT_TYPES.map((t) => (
@@ -288,7 +313,7 @@ export function RecordsPage() {
                   setUnitTypeId('')
                 }}
                 aria-label="Project"
-                className="w-auto"
+                className="w-full md:w-auto"
               >
                 <option value="">All projects</option>
                 {projects.map((p) => (
@@ -301,7 +326,7 @@ export function RecordsPage() {
                 value={unitTypeId}
                 onChange={(e) => setUnitTypeId(e.target.value)}
                 aria-label="Unit type"
-                className="w-auto"
+                className="w-full md:w-auto"
               >
                 <option value="">All unit types</option>
                 {unitTypes.map((u) => (
@@ -314,7 +339,7 @@ export function RecordsPage() {
                 value={sourceId}
                 onChange={(e) => setSourceId(e.target.value)}
                 aria-label="Source"
-                className="w-auto"
+                className="w-full md:w-auto"
               >
                 <option value="">All sources</option>
                 {sources.map((s) => (
@@ -327,7 +352,7 @@ export function RecordsPage() {
                 value={salesPersonId}
                 onChange={(e) => setSalesPersonId(e.target.value)}
                 aria-label="Sales person"
-                className="w-auto"
+                className="w-full md:w-auto"
               >
                 <option value="">All sales persons</option>
                 {team.map((s) => (
@@ -338,7 +363,7 @@ export function RecordsPage() {
                 ))}
               </FilterSelect>
               {isAdmin && (
-                <label className="flex cursor-pointer items-center gap-2 px-1 text-sm text-muted">
+                <label className="col-span-2 flex cursor-pointer items-center gap-2 px-1 text-sm text-muted">
                   <input
                     type="checkbox"
                     checked={includeDeleted}
@@ -349,7 +374,7 @@ export function RecordsPage() {
                 </label>
               )}
               {(activeFilterCount > 0 || search) && (
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="col-span-2 md:col-span-1">
                   <XCircleIcon weight="bold" /> Clear filters
                 </Button>
               )}
@@ -379,116 +404,124 @@ export function RecordsPage() {
                 }
               />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[1080px] text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-line text-[11px] font-semibold tracking-wide text-muted uppercase">
-                      {[
-                        'Date & time',
-                        'Name',
-                        'Phone',
-                        'Email',
-                        'Visit',
-                        'Interest / here to see',
-                        'Source',
-                        'Sales person',
-                        'Recorded by',
-                      ].map((h) => (
-                        <th key={h} scope="col" className="px-4 py-3 font-semibold whitespace-nowrap first:pl-5">
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <AnimatePresence initial={false} mode="popLayout">
-                      {rows.map((w, i) => {
-                        const src = ref.source(w.sourceId)
-                        return (
-                          <motion.tr
-                            key={w.id}
-                            initial={reduce ? false : { opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: reduce ? 0 : Math.min(i * 0.018, 0.35), duration: 0.28 }}
-                            tabIndex={0}
-                            onClick={() => setSelected(w)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault()
-                                setSelected(w)
-                              }
-                            }}
-                            className={cn(
-                              'cursor-pointer border-b border-line/70 transition-colors outline-none last:border-0 hover:bg-gold/[0.06] focus-visible:bg-gold/10',
-                              w.deletedAt && 'opacity-55',
-                            )}
+              <>
+                {/* Phones: one card per visitor */}
+                <ul className="divide-y divide-line md:hidden">
+                  {rows.map((w, i) => (
+                    <motion.li
+                      key={w.id}
+                      initial={reduce ? false : { opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: reduce ? 0 : Math.min(i * 0.02, 0.3), duration: 0.25 }}
+                    >
+                      <WalkInCard walkIn={w} onOpen={() => setSelected(w)} />
+                    </motion.li>
+                  ))}
+                </ul>
+
+                {/* Tablets and up: table */}
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full min-w-[860px] text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-line text-[11px] font-semibold tracking-wide text-muted uppercase">
+                        {[
+                          ['When', ''],
+                          ['Visitor', ''],
+                          ['Email', 'hidden 2xl:table-cell'],
+                          ['Visit', ''],
+                          ['Interest / here to see', ''],
+                          ['Source', ''],
+                          ['Sales person', ''],
+                          ['Recorded by', 'hidden xl:table-cell'],
+                        ].map(([h, cls]) => (
+                          <th
+                            key={h}
+                            scope="col"
+                            className={cn('px-4 py-3 font-semibold whitespace-nowrap first:pl-5', cls)}
                           >
-                            <td className="px-4 py-3 pl-5 whitespace-nowrap">
-                              <span className="font-semibold text-fg tabular-nums">{formatTime(w.visitedAt)}</span>
-                              <span className="block text-xs text-muted">{formatDate(w.visitedAt)}</span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className="font-semibold text-fg">{w.fullName}</span>
-                              <span className="mt-0.5 flex gap-1">
-                                {w.isReturning && <Badge tone="gold">Returning</Badge>}
-                                {w.deletedAt && <Badge tone="danger">Deleted</Badge>}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-fg/90 tabular-nums">
-                              {formatPhone(w.phone)}
-                            </td>
-                            <td className="max-w-[200px] truncate px-4 py-3 text-fg/80">
-                              {w.email ?? <span className="text-muted">—</span>}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              <Badge tone={w.visitType === 'client' ? 'gold' : 'neutral'}>
-                                <VisitTypeIcon type={w.visitType} />
-                                {visitTypeLabel(w.visitType)}
-                              </Badge>
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-fg/90">
-                              {w.visitType === 'client' ? (
-                                <>
-                                  {ref.project(w.projectId)?.name}
-                                  <span className="block text-xs text-muted">{ref.unitType(w.unitTypeId)?.name}</span>
-                                </>
-                              ) : (
-                                <>
-                                  {ref.member(w.hostId)?.fullName ?? w.hostName ?? '—'}
-                                  {(w.organisation || w.purpose) && (
-                                    <span className="block max-w-[220px] truncate text-xs text-muted">
-                                      {[w.organisation, w.purpose].filter(Boolean).join(' · ')}
-                                    </span>
-                                  )}
-                                </>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <AnimatePresence initial={false} mode="popLayout">
+                        {rows.map((w, i) => {
+                          const src = ref.source(w.sourceId)
+                          return (
+                            <motion.tr
+                              key={w.id}
+                              initial={reduce ? false : { opacity: 0, y: 8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: reduce ? 0 : Math.min(i * 0.018, 0.35), duration: 0.28 }}
+                              tabIndex={0}
+                              onClick={() => setSelected(w)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault()
+                                  setSelected(w)
+                                }
+                              }}
+                              className={cn(
+                                'group cursor-pointer border-b border-line/70 transition-colors outline-none last:border-0 hover:bg-gold/[0.06] focus-visible:bg-gold/10',
+                                w.deletedAt && 'opacity-55',
                               )}
-                            </td>
-                            <td className="px-4 py-3">
-                              {src ? (
-                                <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-fg/90">
-                                  <SourceIcon icon={src.icon} className="size-4 text-gold" />
-                                  {src.name}
+                            >
+                              <td className="px-4 py-3 pl-5 whitespace-nowrap">
+                                <span className="font-semibold text-fg tabular-nums">{formatTime(w.visitedAt)}</span>
+                                <span className="block text-xs text-muted">{formatDate(w.visitedAt)}</span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="flex flex-wrap items-center gap-1.5">
+                                  <span className="font-semibold text-fg group-hover:text-link">{w.fullName}</span>
+                                  {w.isReturning && <Badge tone="gold">Returning</Badge>}
+                                  {w.deletedAt && <Badge tone="danger">Deleted</Badge>}
                                 </span>
-                              ) : (
-                                <span className="text-muted">—</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-fg/90">
-                              {ref.member(w.salesPersonId)?.fullName ?? <span className="text-muted">—</span>}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-muted">{w.createdByName}</td>
-                          </motion.tr>
-                        )
-                      })}
-                    </AnimatePresence>
-                  </tbody>
-                </table>
-              </div>
+                                <span className="block text-xs whitespace-nowrap text-muted tabular-nums">
+                                  {formatPhone(w.phone)}
+                                </span>
+                              </td>
+                              <td className="hidden max-w-[220px] truncate px-4 py-3 text-fg/80 2xl:table-cell">
+                                {w.email ?? <span className="text-muted">—</span>}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <Badge tone={w.visitType === 'client' ? 'gold' : 'neutral'}>
+                                  <VisitTypeIcon type={w.visitType} />
+                                  {visitTypeLabel(w.visitType)}
+                                </Badge>
+                              </td>
+                              <td className="px-4 py-3 text-fg/90">
+                                <InterestText walkIn={w} />
+                              </td>
+                              <td className="px-4 py-3">
+                                {src ? (
+                                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-fg/90">
+                                    <SourceIcon icon={src.icon} className="size-4 text-gold" />
+                                    {src.name}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted">—</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-fg/90">
+                                {ref.member(w.salesPersonId)?.fullName ?? <span className="text-muted">—</span>}
+                              </td>
+                              <td className="hidden px-4 py-3 whitespace-nowrap text-muted xl:table-cell">
+                                {w.createdByName}
+                              </td>
+                            </motion.tr>
+                          )
+                        })}
+                      </AnimatePresence>
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
 
           {/* Pagination */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3 text-sm">
+          <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-sm sm:px-5">
             <p className="text-muted">
               {from}–{to} of <span className="font-semibold text-fg">{total}</span>
             </p>
@@ -500,7 +533,7 @@ export function RecordsPage() {
                 onClick={() => setPage((p) => p - 1)}
                 aria-label="Previous page"
               >
-                <CaretLeftIcon weight="bold" /> Prev
+                <CaretLeftIcon weight="bold" /> <span className="max-sm:sr-only">Prev</span>
               </Button>
               <span className="px-2 text-muted tabular-nums">
                 {page + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}
@@ -512,7 +545,7 @@ export function RecordsPage() {
                 onClick={() => setPage((p) => p + 1)}
                 aria-label="Next page"
               >
-                Next <CaretRightIcon weight="bold" />
+                <span className="max-sm:sr-only">Next</span> <CaretRightIcon weight="bold" />
               </Button>
             </div>
           </div>
@@ -521,6 +554,78 @@ export function RecordsPage() {
 
       <WalkInDrawer walkIn={selected} onClose={() => setSelected(null)} onChanged={refresh} />
     </div>
+  )
+}
+
+/** Project and unit for clients; who they came to see for other visitors. */
+function InterestText({ walkIn: w, inline = false }: { walkIn: WalkIn; inline?: boolean }) {
+  const ref = useRefData()
+  const [main, sub] =
+    w.visitType === 'client'
+      ? [ref.project(w.projectId)?.name, ref.unitType(w.unitTypeId)?.name]
+      : [
+          ref.member(w.hostId)?.fullName ?? w.hostName ?? undefined,
+          [w.organisation, w.purpose].filter(Boolean).join(' · ') || undefined,
+        ]
+  if (inline) return <>{[main, sub].filter(Boolean).join(' · ') || '—'}</>
+  return (
+    <>
+      <span className="whitespace-nowrap">{main ?? '—'}</span>
+      {sub && <span className="block max-w-[220px] truncate text-xs text-muted">{sub}</span>}
+    </>
+  )
+}
+
+function WalkInCard({ walkIn: w, onOpen }: { walkIn: WalkIn; onOpen: () => void }) {
+  const ref = useRefData()
+  const src = ref.source(w.sourceId)
+  const isClient = w.visitType === 'client'
+  const salesPerson = ref.member(w.salesPersonId)?.fullName
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={cn(
+        'flex w-full items-start gap-3 px-4 py-3.5 text-left focus-ring transition-colors active:bg-gold/[0.08]',
+        w.deletedAt && 'opacity-55',
+      )}
+    >
+      <span
+        className={cn(
+          'mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl',
+          isClient ? 'bg-gold/12 text-gold' : 'bg-fg/[0.06] text-muted',
+        )}
+      >
+        {isClient && src ? (
+          <SourceIcon icon={src.icon} className="size-5" />
+        ) : (
+          <VisitTypeIcon type={w.visitType} className="size-5" />
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-baseline justify-between gap-2">
+          <span className="truncate font-semibold text-fg">{w.fullName}</span>
+          <span className="shrink-0 text-xs font-semibold text-muted tabular-nums">{formatTime(w.visitedAt)}</span>
+        </span>
+        <span className="mt-0.5 block truncate text-[13px] text-fg/80">
+          <InterestText walkIn={w} inline />
+        </span>
+        <span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+          <span className="tabular-nums">{formatDate(w.visitedAt)}</span>
+          <span aria-hidden>·</span>
+          {isClient ? <span>{src?.name ?? '—'}</span> : <span>{visitTypeLabel(w.visitType)}</span>}
+          {salesPerson && (
+            <>
+              <span aria-hidden>·</span>
+              <span className="truncate">{salesPerson}</span>
+            </>
+          )}
+          {w.isReturning && <Badge tone="gold">Returning</Badge>}
+          {w.deletedAt && <Badge tone="danger">Deleted</Badge>}
+        </span>
+      </span>
+      <CaretRightIcon weight="bold" className="mt-3 size-4 shrink-0 text-muted/70" />
+    </button>
   )
 }
 

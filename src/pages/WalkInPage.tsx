@@ -166,11 +166,15 @@ export function WalkInPage() {
         eyebrow="Reception"
         title="New walk-in"
         description="Record each visitor as they arrive. Fields marked * are required."
-        actions={<StaffDirectoryButton />}
+        actions={
+          <div className="hidden md:block">
+            <StaffDirectoryButton />
+          </div>
+        }
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <Card className="p-5 sm:p-7">
+        <Card className="p-4 sm:p-7">
           <form noValidate onSubmit={handleSubmit(onSubmit)}>
             <div className="mb-6 grid grid-cols-2 gap-3">
               <ReadOnlyTile icon={<CalendarIcon weight="duotone" />} label="Date" value={date} />
@@ -240,13 +244,14 @@ export function WalkInPage() {
               </p>
             )}
 
-            <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs text-muted">
+            {/* On phones the save bar sticks just above the tab bar, so Save is always one tap away. */}
+            <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+68px)] z-10 -mx-4 mt-6 flex items-center justify-between gap-3 border-t border-line bg-bg-elevated/95 px-4 py-3 backdrop-blur-xl sm:-mx-7 sm:px-7 md:static md:mx-0 md:mt-7 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+              <p className="hidden text-xs text-muted md:block">
                 Press{' '}
                 <kbd className="rounded border border-line bg-bg-sunken px-1.5 py-0.5 font-sans text-[11px]">Enter</kbd>{' '}
                 to save
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-1 gap-2 md:flex-none">
                 <Button variant="ghost" onClick={nextVisitor} disabled={button === 'loading'}>
                   <ArrowCounterClockwiseIcon weight="bold" /> Clear
                 </Button>
@@ -256,7 +261,7 @@ export function WalkInPage() {
                   state={button}
                   icon={<FloppyDiskIcon weight="bold" />}
                   labels={{ idle: 'Save walk-in', loading: 'Saving…', success: 'Saved', error: 'Not saved' }}
-                  className="min-w-[170px]"
+                  className="flex-1 md:min-w-[170px] md:flex-none"
                 />
               </div>
             </div>

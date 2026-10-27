@@ -9,12 +9,25 @@ import {
 import type { ComponentType } from 'react'
 import type { VisitType } from '../data/types'
 
-export const VISIT_TYPES: { value: VisitType; label: string; short: string; Icon: ComponentType<IconProps> }[] = [
-  { value: 'client', label: 'Client – property enquiry', short: 'Client', Icon: HouseLineIcon },
-  { value: 'meeting', label: 'Meeting / visiting staff', short: 'Meeting', Icon: HandshakeIcon },
-  { value: 'delivery', label: 'Delivery / courier', short: 'Delivery', Icon: PackageIcon },
-  { value: 'interview', label: 'Job interview', short: 'Interview', Icon: BriefcaseIcon },
-  { value: 'other', label: 'Other visit', short: 'Other', Icon: DotsThreeIcon },
+export const VISIT_TYPES: {
+  value: VisitType
+  label: string
+  short: string
+  /** Fits the choice cards on the walk-in form. */
+  chip: string
+  Icon: ComponentType<IconProps>
+}[] = [
+  {
+    value: 'client',
+    label: 'Client – property enquiry',
+    short: 'Client',
+    chip: 'Property client',
+    Icon: HouseLineIcon,
+  },
+  { value: 'meeting', label: 'Meeting / visiting staff', short: 'Meeting', chip: 'Meeting staff', Icon: HandshakeIcon },
+  { value: 'delivery', label: 'Delivery / courier', short: 'Delivery', chip: 'Delivery', Icon: PackageIcon },
+  { value: 'interview', label: 'Job interview', short: 'Interview', chip: 'Interview', Icon: BriefcaseIcon },
+  { value: 'other', label: 'Other visit', short: 'Other', chip: 'Other visit', Icon: DotsThreeIcon },
 ]
 
 export const visitTypeLabel = (t: VisitType) => VISIT_TYPES.find((v) => v.value === t)?.short ?? t

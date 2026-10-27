@@ -237,7 +237,7 @@ export function WalkInFields({
               compact
               selected={visitType === t.value}
               icon={<t.Icon weight={visitType === t.value ? 'fill' : 'duotone'} />}
-              label={t.label}
+              label={t.chip}
               input={<input type="radio" value={t.value} {...register('visitType')} className="peer sr-only" />}
             />
           ))}

@@ -109,6 +109,13 @@
     0 0 0 4px rgb(201 154 48 / 0.2),
     0 10px 28px -10px rgb(201 154 48 / 0.5);
 }
+/* Space for the phone's home indicator / notch when installed as an app. */
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
 @utility focus-ring {
   &:focus-visible {
     outline: none;
@@ -124,6 +131,7 @@ body,
 
 body {
   margin: 0;
+  -webkit-tap-highlight-color: transparent;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
@@ -149,6 +157,17 @@ body {
 /* Deeper golds on ivory so the sheen never washes out. */
 [data-theme='light'] .text-gold-sheen {
   background-image: linear-gradient(100deg, #7a5b17 0%, #c99a30 25%, #d6ab4a 50%, #c99a30 75%, #7a5b17 100%);
+}
+
+/* The open list of a native select is drawn by the OS. Our field backgrounds are translucent, so without
+   solid colours here Windows shows light text on a white list (invisible until hovered). */
+select option,
+select optgroup {
+  background-color: var(--bg-elevated);
+  color: var(--text);
+}
+select option:disabled {
+  color: var(--text-muted);
 }
 
 /* Native selects: custom chevron, consistent with the text fields. */

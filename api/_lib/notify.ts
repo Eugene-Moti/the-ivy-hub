@@ -143,7 +143,7 @@ const subject = (c: Context) =>
   c.isClient ? `Your client ${c.visitor.name} just walked in` : `Your visitor ${c.visitor.name} is at reception`
 
 function emailHtml(c: Context) {
-  const appUrl = env('APP_URL')
+  const appUrl = env('APP_URL').replace(/\/+$/, '')
   const rows: [string, string][] = c.isClient
     ? [
         ['Client', c.visitor.name],

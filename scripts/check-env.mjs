@@ -2,6 +2,7 @@
 // Checks your settings before deploying: are all the values filled in, do they look right, and do
 // they actually work? Secret values are never printed.   npm run env:check
 
+import fs from 'node:fs'
 import pg from 'pg'
 
 const ok = (msg) => console.log(`  ✓ ${msg}`)
@@ -11,6 +12,37 @@ const bad = (msg) => {
   process.exitCode = 1
 }
 const v = (key) => process.env[key]?.trim() || ''
+
+// Common .env.local mistakes that silently blank a value (the file itself is read, never printed).
+if (fs.existsSync('.env.local')) {
+  console.log('\n0. .env.local format')
+  const seen = new Map()
+  let problems = 0
+  fs.readFileSync('.env.local', 'utf8')
+    .split(/\r?\n/)
+    .forEach((line, i) => {
+      const n = i + 1
+      if (/^\s*[A-Z][A-Z0-9_]*\s*:\s*\S/.test(line)) {
+        bad(`line ${n}: uses "NAME: value"; it must be NAME=value (this line is ignored)`)
+        problems++
+      }
+      const m = /^\s*([A-Z][A-Z0-9_]*)\s*=(.*)$/.exec(line)
+      if (!m) return
+      const [, key, raw] = m
+      if (seen.has(key)) {
+        bad(`line ${n}: ${key} appears again (first on line ${seen.get(key)}); the last one wins, so keep only one`)
+        problems++
+      }
+      seen.set(key, n)
+      if (/^\s+\S/.test(raw)) warn(`line ${n}: space after "=" in ${key}; write ${key}=value`)
+      const value = raw.trim()
+      if (value.startsWith('#') || /\s#/.test(value.replace(/^(["']).*\1$/, ''))) {
+        bad(`line ${n}: ${key} contains "#", which starts a comment; wrap the value in double quotes`)
+        problems++
+      }
+    })
+  if (!problems) ok('format looks fine')
+}
 
 console.log('\n1. Values in .env.local')
 const authUrl = v('VITE_NEON_AUTH_URL').replace(/\/$/, '')
@@ -37,7 +69,10 @@ else
 
 if (!v('NEON_AUTH_JWKS_URL')) warn('NEON_AUTH_JWKS_URL is empty; using Auth URL + /.well-known/jwks.json')
 else ok('NEON_AUTH_JWKS_URL is set')
-v('APP_URL') ? ok(`APP_URL is ${v('APP_URL')}`) : warn('APP_URL is empty (fine until you know your Vercel address)')
+if (!v('APP_URL')) warn('APP_URL is empty (fine until you know your Vercel address)')
+else if (v('APP_URL').endsWith('/')) warn('APP_URL ends with "/"; remove it (https://the-ivy-hub.vercel.app)')
+else ok(`APP_URL is ${v('APP_URL')}`)
+if (!v('SEED_TEMP_PASSWORD')) warn('SEED_TEMP_PASSWORD is empty (needed only for npm run db:seed-users)')
 v('CRON_SECRET').length >= 24
   ? ok('CRON_SECRET is set')
   : warn('CRON_SECRET is empty or short (needed on Vercel for the daily retry job)')

@@ -8,6 +8,7 @@ import {
   FileXlsIcon,
   FunnelSimpleIcon,
   MagnifyingGlassIcon,
+  PhoneIcon,
   TableIcon,
   XCircleIcon,
 } from '@phosphor-icons/react'
@@ -582,50 +583,55 @@ function WalkInCard({ walkIn: w, onOpen }: { walkIn: WalkIn; onOpen: () => void 
   const isClient = w.visitType === 'client'
   const salesPerson = ref.member(w.salesPersonId)?.fullName
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={cn(
-        'flex w-full items-start gap-3 px-4 py-3.5 text-left focus-ring transition-colors active:bg-gold/[0.08]',
-        w.deletedAt && 'opacity-55',
-      )}
-    >
-      <span
-        className={cn(
-          'mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl',
-          isClient ? 'bg-gold/12 text-gold' : 'bg-fg/[0.06] text-muted',
-        )}
+    <div className={cn('flex items-center', w.deletedAt && 'opacity-55')}>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex min-w-0 flex-1 items-start gap-3 py-3.5 pl-4 text-left focus-ring transition-colors active:bg-gold/[0.08]"
       >
-        {isClient && src ? (
-          <SourceIcon icon={src.icon} className="size-5" />
-        ) : (
-          <VisitTypeIcon type={w.visitType} className="size-5" />
-        )}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="flex items-baseline justify-between gap-2">
-          <span className="truncate font-semibold text-fg">{w.fullName}</span>
-          <span className="shrink-0 text-xs font-semibold text-muted tabular-nums">{formatTime(w.visitedAt)}</span>
-        </span>
-        <span className="mt-0.5 block truncate text-[13px] text-fg/80">
-          <InterestText walkIn={w} inline />
-        </span>
-        <span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
-          <span className="tabular-nums">{formatDate(w.visitedAt)}</span>
-          <span aria-hidden>·</span>
-          {isClient ? <span>{src?.name ?? '—'}</span> : <span>{visitTypeLabel(w.visitType)}</span>}
-          {salesPerson && (
-            <>
-              <span aria-hidden>·</span>
-              <span className="truncate">{salesPerson}</span>
-            </>
+        <span
+          className={cn(
+            'mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl',
+            isClient ? 'bg-gold/12 text-gold' : 'bg-fg/[0.06] text-muted',
           )}
-          {w.isReturning && <Badge tone="gold">Returning</Badge>}
-          {w.deletedAt && <Badge tone="danger">Deleted</Badge>}
+        >
+          {isClient && src ? (
+            <SourceIcon icon={src.icon} className="size-5" />
+          ) : (
+            <VisitTypeIcon type={w.visitType} className="size-5" />
+          )}
         </span>
-      </span>
-      <CaretRightIcon weight="bold" className="mt-3 size-4 shrink-0 text-muted/70" />
-    </button>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-baseline justify-between gap-2">
+            <span className="truncate font-semibold text-fg">{w.fullName}</span>
+            <span className="shrink-0 text-xs font-semibold text-muted tabular-nums">{formatTime(w.visitedAt)}</span>
+          </span>
+          <span className="mt-0.5 block truncate text-[13px] text-fg/80">
+            <InterestText walkIn={w} inline />
+          </span>
+          <span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+            <span className="tabular-nums">{formatDate(w.visitedAt)}</span>
+            <span aria-hidden>·</span>
+            {isClient ? <span>{src?.name ?? '—'}</span> : <span>{visitTypeLabel(w.visitType)}</span>}
+            {salesPerson && (
+              <>
+                <span aria-hidden>·</span>
+                <span className="truncate">{salesPerson}</span>
+              </>
+            )}
+            {w.isReturning && <Badge tone="gold">Returning</Badge>}
+            {w.deletedAt && <Badge tone="danger">Deleted</Badge>}
+          </span>
+        </span>
+      </button>
+      <a
+        href={`tel:${w.phone}`}
+        aria-label={`Call ${w.fullName}`}
+        className="mx-3 grid size-11 shrink-0 place-items-center rounded-full border border-line text-gold focus-ring transition-colors active:bg-gold/[0.12]"
+      >
+        <PhoneIcon weight="fill" className="size-5" />
+      </a>
+    </div>
   )
 }
 

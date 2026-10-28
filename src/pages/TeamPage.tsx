@@ -11,6 +11,7 @@ import {
   UsersThreeIcon,
   WhatsappLogoIcon,
 } from '@phosphor-icons/react'
+import { ContactActions } from '../components/ContactActions'
 import { Button } from '../components/ui/Button'
 import { inputClass } from '../components/ui/Field'
 import { HoldToConfirmButton } from '../components/ui/HoldToConfirmButton'
@@ -113,7 +114,7 @@ export function TeamPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           <AnimatePresence initial={false}>
             {people.map((p, i) => (
               <motion.div
@@ -165,6 +166,13 @@ export function TeamPage() {
                       <EnvelopeSimpleIcon weight="duotone" /> <span className="truncate">{p.email}</span>
                     </li>
                   </ul>
+                  <ContactActions
+                    name={p.fullName}
+                    phone={p.phone}
+                    whatsapp={p.whatsapp}
+                    email={p.email}
+                    className="mt-4"
+                  />
                   <div className="mt-auto flex flex-wrap items-center gap-2 pt-5">
                     <Button size="sm" variant="secondary" onClick={() => setEditing(p)}>
                       <PencilSimpleIcon weight="bold" /> Edit

@@ -14,7 +14,6 @@ import { api } from '../../data'
 import { useRefData } from '../../data/RefDataProvider'
 import type { WalkIn, WalkInNotification } from '../../data/types'
 import { formatPhone } from '../../lib/phone'
-import { whatsappAnchor } from '../../lib/whatsapp'
 import { formatDateTime, timeAgo } from '../../lib/time'
 import { Button } from '../ui/Button'
 import { DynamicButton, useDynamicAction } from '../ui/DynamicButton'
@@ -25,6 +24,7 @@ import { Badge, usePrint } from '../ui/Primitives'
 import { useToast } from '../ui/Toaster'
 import { ChannelIcon, PrintableSlip, PrintableVisitorPass, useWalkInLabels, VisitorPass } from '../walkin/WalkInDocs'
 import { NotifyContact } from '../walkin/NotifyContact'
+import { ContactActions } from '../ContactActions'
 import { EditWalkInModal } from './EditWalkInModal'
 
 interface Props {
@@ -90,14 +90,9 @@ export function WalkInDrawer({ walkIn, onClose, onChanged }: Props) {
     ['Visited', formatDateTime(w.visitedAt)],
     [
       'Phone',
-      <span className="flex flex-wrap gap-x-3">
-        <a className="text-link hover:underline" href={`tel:${w.phone}`}>
-          {formatPhone(w.phone)}
-        </a>
-        <a className="text-link hover:underline" {...whatsappAnchor(w.phone)}>
-          WhatsApp
-        </a>
-      </span>,
+      <a className="text-link tabular-nums hover:underline" href={`tel:${w.phone}`}>
+        {formatPhone(w.phone)}
+      </a>,
     ],
     [
       'Email',
@@ -175,6 +170,8 @@ export function WalkInDrawer({ walkIn, onClose, onChanged }: Props) {
               <p className="mt-0.5 text-muted">Reason: {w.deleteReason}</p>
             </div>
           )}
+
+          <ContactActions name={w.fullName} phone={w.phone} email={w.email} className="-mt-2" />
 
           <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
             {details.map(([k, v]) => (

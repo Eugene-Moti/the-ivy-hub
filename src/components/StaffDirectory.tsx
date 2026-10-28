@@ -1,17 +1,10 @@
 import { useMemo, useState } from 'react'
-import {
-  AddressBookIcon,
-  CopyIcon,
-  EnvelopeSimpleIcon,
-  MagnifyingGlassIcon,
-  PhoneIcon,
-  WhatsappLogoIcon,
-} from '@phosphor-icons/react'
+import { AddressBookIcon, CopyIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { useRefData } from '../data/RefDataProvider'
 import type { TeamMember } from '../data/types'
 import { cn } from '../lib/cn'
 import { formatPhone } from '../lib/phone'
-import { whatsappAnchor } from '../lib/whatsapp'
+import { ContactActions } from './ContactActions'
 import { Button } from './ui/Button'
 import { inputClass } from './ui/Field'
 import { Modal } from './ui/Overlay'
@@ -120,9 +113,6 @@ function ContactCard({ person: p }: { person: TeamMember }) {
       toast({ title: 'Could not copy', tone: 'error' })
     }
   }
-  const action =
-    'focus-ring inline-flex h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-[13px] font-semibold text-fg transition-colors hover:border-gold/50 [&_svg]:size-4'
-
   return (
     <li className="rounded-xl border border-line bg-bg-elevated/70 p-4">
       <div className="flex items-start gap-3">
@@ -167,17 +157,7 @@ function ContactCard({ person: p }: { person: TeamMember }) {
           <dd className="truncate text-fg">{p.email}</dd>
         </div>
       </dl>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <a href={`tel:${p.phone}`} className={action}>
-          <PhoneIcon weight="bold" /> Call
-        </a>
-        <a {...whatsappAnchor(p.whatsapp)} className={action}>
-          <WhatsappLogoIcon weight="fill" className="text-[#25d366]" /> WhatsApp
-        </a>
-        <a href={`mailto:${p.email}`} className={action}>
-          <EnvelopeSimpleIcon weight="bold" /> Email
-        </a>
-      </div>
+      <ContactActions name={p.fullName} phone={p.phone} whatsapp={p.whatsapp} email={p.email} className="mt-3" />
     </li>
   )
 }

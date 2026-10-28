@@ -11,7 +11,7 @@ import { useRefData } from '../data/RefDataProvider'
 import type { TeamMember } from '../data/types'
 import { cn } from '../lib/cn'
 import { formatPhone } from '../lib/phone'
-import { whatsappLink } from '../lib/whatsapp'
+import { whatsappAnchor } from '../lib/whatsapp'
 import { Button } from './ui/Button'
 import { inputClass } from './ui/Field'
 import { Modal } from './ui/Overlay'
@@ -171,7 +171,7 @@ function ContactCard({ person: p }: { person: TeamMember }) {
         <a href={`tel:${p.phone}`} className={action}>
           <PhoneIcon weight="bold" /> Call
         </a>
-        <a href={whatsappLink(p.whatsapp)} target="_blank" rel="noreferrer" className={action}>
+        <a {...whatsappAnchor(p.whatsapp)} className={action}>
           <WhatsappLogoIcon weight="fill" className="text-[#25d366]" /> WhatsApp
         </a>
         <a href={`mailto:${p.email}`} className={action}>

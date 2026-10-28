@@ -14,6 +14,7 @@ import { api } from '../../data'
 import { useRefData } from '../../data/RefDataProvider'
 import type { WalkIn, WalkInNotification } from '../../data/types'
 import { formatPhone } from '../../lib/phone'
+import { whatsappAnchor } from '../../lib/whatsapp'
 import { formatDateTime, timeAgo } from '../../lib/time'
 import { Button } from '../ui/Button'
 import { DynamicButton, useDynamicAction } from '../ui/DynamicButton'
@@ -93,12 +94,7 @@ export function WalkInDrawer({ walkIn, onClose, onChanged }: Props) {
         <a className="text-link hover:underline" href={`tel:${w.phone}`}>
           {formatPhone(w.phone)}
         </a>
-        <a
-          className="text-link hover:underline"
-          href={`https://wa.me/${w.phone.replace(/\D/g, '')}`}
-          target="_blank"
-          rel="noreferrer"
-        >
+        <a className="text-link hover:underline" {...whatsappAnchor(w.phone)}>
           WhatsApp
         </a>
       </span>,

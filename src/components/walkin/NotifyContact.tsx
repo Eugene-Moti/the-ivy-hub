@@ -3,7 +3,7 @@ import { useRefData } from '../../data/RefDataProvider'
 import type { WalkIn } from '../../data/types'
 import { cn } from '../../lib/cn'
 import { formatPhone } from '../../lib/phone'
-import { arrivalMessage, whatsappLink } from '../../lib/whatsapp'
+import { arrivalMessage, whatsappAnchor } from '../../lib/whatsapp'
 import { buttonBase, buttonSizes, buttonVariants } from '../ui/Button'
 import { useToast } from '../ui/Toaster'
 import type { WalkInLabels } from './WalkInDocs'
@@ -60,9 +60,7 @@ export function NotifyContact({
       <p className="mt-3 rounded-lg bg-bg-elevated/80 p-3 text-[13px] leading-relaxed text-fg/85">{message}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <a
-          href={whatsappLink(member?.whatsapp, message)}
-          target="_blank"
-          rel="noreferrer"
+          {...whatsappAnchor(member?.whatsapp, message)}
           className={cn(link, 'bg-[#25d366] text-[#073b1d] shadow-[0_10px_24px_-14px_#25d366] hover:brightness-105')}
         >
           <WhatsappLogoIcon weight="fill" /> {member ? 'Send on WhatsApp' : 'Open WhatsApp'}
